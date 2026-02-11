@@ -1,0 +1,15 @@
+{
+  "version": "coc7-es",
+  "categories": [
+    "descripcion_personal",
+    "ideologia_creencias",
+    "allegados",
+    "lugares_significativos",
+    "posesiones_preciadas",
+    "rasgos"
+  ],
+  "notes": [
+    "En la mesa se recomienda redactar entre 3 y 6 frases en total para arrancar.",
+    "Se pueden completar categorias adicionales durante la campana: lesiones/cicatrices, fobias/manias, tomos, hechizos/artefactos y encuentros con entes."
+  ]
+}

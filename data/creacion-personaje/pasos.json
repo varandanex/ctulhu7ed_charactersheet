@@ -1,0 +1,35 @@
+{
+  "version": "coc7-es",
+  "steps": [
+    {
+      "id": 1,
+      "key": "generar_caracteristicas",
+      "title": "Generar caracteristicas",
+      "description": "Generar FUE, CON, TAM, DES, APA, INT, POD, EDU y Suerte; aplicar edad y calcular derivados basicos."
+    },
+    {
+      "id": 2,
+      "key": "determinar_ocupacion",
+      "title": "Determinar ocupacion",
+      "description": "Elegir profesion, rango de Credito y conjunto de habilidades de ocupacion."
+    },
+    {
+      "id": 3,
+      "key": "habilidades",
+      "title": "Elegir habilidades y distribuir puntos",
+      "description": "Asignar puntos de ocupacion y puntos de interes particular (INT x2)."
+    },
+    {
+      "id": 4,
+      "key": "trasfondo",
+      "title": "Crear trasfondo",
+      "description": "Definir historia personal, motivaciones, allegados, rasgos y elementos clave del personaje."
+    },
+    {
+      "id": 5,
+      "key": "equipo",
+      "title": "Equipar investigador",
+      "description": "Determinar dinero/propiedades y anotar equipo, armas y objetos relevantes."
+    }
+  ]
+}

@@ -1,0 +1,230 @@
+import { describe, expect, it } from "vitest";
+import {
+  applyAgeModifiers,
+  computeDerivedStats,
+  evaluateOccupationPointsFormula,
+  validateStep,
+  validateSkillAllocation,
+} from "@/domain/rules";
+import type { CharacterDraft, Characteristics } from "@/domain/types";
+
+const sampleCharacteristics: Characteristics = {
+  FUE: 60,
+  CON: 50,
+  TAM: 65,
+  DES: 55,
+  APA: 45,
+  INT: 70,
+  POD: 55,
+  EDU: 80,
+  SUERTE: 50,
+};
+
+describe("domain rules", () => {
+  it("computes derived stats with expected values", () => {
+    const derived = computeDerivedStats(sampleCharacteristics, 25);
+
+    expect(derived.pv).toBe(Math.floor((50 + 65) / 10));
+    expect(derived.pmInicial).toBe(Math.floor(55 / 5));
+    expect(derived.corInicial).toBe(55);
+    expect(derived.hard.EDU).toBe(40);
+    expect(derived.extreme.INT).toBe(14);
+  });
+
+  it("evaluates occupation formulas with options", () => {
+    const pointsA = evaluateOccupationPointsFormula("EDU x2 + (DES x2 o FUE x2)", sampleCharacteristics);
+    const pointsB = evaluateOccupationPointsFormula("EDU x2 + APA x2", sampleCharacteristics);
+
+    expect(pointsA).toBe(80 * 2 + Math.max(55 * 2, 60 * 2));
+    expect(pointsB).toBe(80 * 2 + 45 * 2);
+  });
+
+  it("evaluates formulas with parenthesized first term", () => {
+    const points = evaluateOccupationPointsFormula("(APA x2) + (DES x2 o FUE x2)", sampleCharacteristics);
+    expect(points).toBe(45 * 2 + Math.max(55 * 2, 60 * 2));
+  });
+
+  it("evaluates formulas with three alternative characteristics", () => {
+    const points = evaluateOccupationPointsFormula("EDU x2 + (APA x2 o DES x2 o FUE x2)", sampleCharacteristics);
+    expect(points).toBe(80 * 2 + Math.max(45 * 2, 55 * 2, 60 * 2));
+  });
+
+  it("applies EDU improvement rolls for age 20+", () => {
+    const base: Characteristics = {
+      FUE: 50,
+      CON: 50,
+      TAM: 50,
+      DES: 50,
+      APA: 50,
+      INT: 50,
+      POD: 50,
+      EDU: 40,
+      SUERTE: 50,
+    };
+    const modified = applyAgeModifiers(base, 25);
+    expect(modified.EDU).toBeGreaterThanOrEqual(40);
+    expect(modified.EDU).toBeLessThanOrEqual(99);
+  });
+
+  it("rejects forbidden skills for personal interest", () => {
+    const issues = validateSkillAllocation(100, 100, { Psicologia: 10 }, { "Mitos de Cthulhu": 10 });
+    expect(issues.some((issue) => issue.code === "FORBIDDEN_SKILL")).toBe(true);
+  });
+
+  it("counts credit as occupation points", () => {
+    const issues = validateSkillAllocation(100, 100, { Psicologia: 30 }, { Historia: 10 }, 80);
+    expect(issues.some((issue) => issue.code === "OCCUPATION_POINTS_EXCEEDED")).toBe(true);
+  });
+
+  it("ignores credit skill values in skill buckets", () => {
+    const issues = validateSkillAllocation(120, 100, { Credito: 50, Psicologia: 10 }, { Credito: 90, Historia: 20 }, 70);
+    expect(issues.some((issue) => issue.code === "OCCUPATION_POINTS_EXCEEDED")).toBe(false);
+    expect(issues.some((issue) => issue.code === "PERSONAL_POINTS_EXCEEDED")).toBe(false);
+  });
+
+  it("validates occupation budget including credit rating", () => {
+    const draft: CharacterDraft = {
+      mode: "manual",
+      age: 25,
+      era: "clasica",
+      characteristics: sampleCharacteristics,
+      occupation: {
+        name: "Abogado",
+        creditRating: 80,
+        selectedSkills: ["Buscar libros"],
+        selectedChoices: {
+          "0:interpersonales": ["Charlataneria", "Encanto"],
+          "1:libres": ["Descubrir", "Historia"],
+        },
+      },
+      skills: {
+        occupation: {
+          "Buscar libros": 241,
+        },
+        personal: {},
+      },
+      background: {},
+      identity: {
+        nombre: "",
+        genero: "",
+        residenciaActual: "",
+        lugarNacimiento: "",
+      },
+      companions: [],
+      equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
+    };
+
+    const issues = validateStep(3, draft);
+    expect(issues.some((issue) => issue.code === "OCCUPATION_POINTS_EXCEEDED")).toBe(true);
+  });
+
+  it("rejects occupation points assigned to non-occupation skills", () => {
+    const draft: CharacterDraft = {
+      mode: "manual",
+      age: 25,
+      era: "clasica",
+      characteristics: sampleCharacteristics,
+      occupation: {
+        name: "Abogado",
+        creditRating: 40,
+        selectedSkills: [],
+        selectedChoices: {
+          "0:interpersonales": ["Persuasion", "Encanto"],
+          "1:libres": ["Historia", "Descubrir"],
+        },
+      },
+      skills: {
+        occupation: {
+          Pilotar: 20,
+        },
+        personal: {},
+      },
+      background: {},
+      identity: {
+        nombre: "",
+        genero: "",
+        residenciaActual: "",
+        lugarNacimiento: "",
+      },
+      companions: [],
+      equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
+    };
+
+    const issues = validateStep(3, draft);
+    expect(issues.some((issue) => issue.code === "INVALID_OCCUPATION_SKILL")).toBe(true);
+  });
+
+  it("requires all six core background categories in step 4", () => {
+    const draft: CharacterDraft = {
+      mode: "manual",
+      age: 25,
+      era: "clasica",
+      characteristics: sampleCharacteristics,
+      occupation: {
+        name: "Abogado",
+        creditRating: 40,
+        selectedSkills: [],
+        selectedChoices: {
+          "0:interpersonales": ["Persuasion", "Encanto"],
+          "1:libres": ["Historia", "Descubrir"],
+        },
+      },
+      skills: {
+        occupation: {
+          "Buscar libros": 100,
+        },
+        personal: {},
+      },
+      background: {
+        descripcionPersonal: "Reservado y meticuloso.",
+        ideologiaCreencias: "Confia en la ley.",
+        allegados: "Su hermana Clara.",
+        lugaresSignificativos: "Despacho del bufete.",
+        posesionesPreciadas: "Reloj familiar.",
+        rasgos: "",
+      },
+      identity: {
+        nombre: "",
+        genero: "",
+        residenciaActual: "",
+        lugarNacimiento: "",
+      },
+      companions: [],
+      equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
+    };
+
+    const missingCoreFields = validateStep(4, draft);
+    expect(missingCoreFields.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(true);
+
+    draft.background.rasgos = "Paciente y observador.";
+    const completeBackground = validateStep(4, draft);
+    expect(completeBackground.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
+  });
+
+  it("warns when age changes after random roll generation", () => {
+    const draft: CharacterDraft = {
+      mode: "random",
+      age: 40,
+      lastRolledAge: 25,
+      era: "clasica",
+      characteristics: sampleCharacteristics,
+      occupation: undefined,
+      skills: {
+        occupation: {},
+        personal: {},
+      },
+      background: {},
+      identity: {
+        nombre: "",
+        genero: "",
+        residenciaActual: "",
+        lugarNacimiento: "",
+      },
+      companions: [],
+      equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
+    };
+
+    const issues = validateStep(1, draft);
+    expect(issues.some((issue) => issue.code === "AGE_ROLL_MISMATCH" && issue.severity === "warning")).toBe(true);
+  });
+});

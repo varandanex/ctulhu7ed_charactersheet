@@ -1,0 +1,98 @@
+{
+  "version": "coc7-es",
+  "characteristics_generation": {
+    "FUE": "3D6x5",
+    "CON": "3D6x5",
+    "TAM": "(2D6+6)x5",
+    "DES": "3D6x5",
+    "APA": "3D6x5",
+    "INT": "(2D6+6)x5",
+    "POD": "3D6x5",
+    "EDU": "(2D6+6)x5",
+    "SUERTE": "3D6x5"
+  },
+  "age_rules": [
+    {
+      "range": "15-19",
+      "effects": [
+        "-5 puntos repartidos entre FUE y TAM",
+        "-5 EDU",
+        "tirar SUERTE 2 veces y quedarse con la mayor"
+      ],
+      "edu_improvement_rolls": 0
+    },
+    {
+      "range": "20-39",
+      "effects": ["sin penalizadores fisicos"],
+      "edu_improvement_rolls": 1
+    },
+    {
+      "range": "40-49",
+      "effects": ["-5 repartidos entre FUE/CON/DES", "-5 APA"],
+      "edu_improvement_rolls": 2
+    },
+    {
+      "range": "50-59",
+      "effects": ["-10 repartidos entre FUE/CON/DES", "-10 APA"],
+      "edu_improvement_rolls": 3
+    },
+    {
+      "range": "60-69",
+      "effects": ["-20 repartidos entre FUE/CON/DES", "-15 APA"],
+      "edu_improvement_rolls": 4
+    },
+    {
+      "range": "70-79",
+      "effects": ["-40 repartidos entre FUE/CON/DES", "-20 APA"],
+      "edu_improvement_rolls": 4
+    },
+    {
+      "range": "80-89",
+      "effects": ["-80 repartidos entre FUE/CON/DES", "-25 APA"],
+      "edu_improvement_rolls": 4
+    }
+  ],
+  "edu_improvement_rule": "Tirar 1D100; si el resultado es mayor que EDU actual, sumar 1D10 (max EDU 99).",
+  "derived_stats": {
+    "COR_inicial": "igual a POD",
+    "PM_inicial": "POD/5",
+    "PV": "floor((CON + TAM)/10)",
+    "MOV": {
+      "base": [
+        {"condition": "DES < TAM y FUE < TAM", "value": 7},
+        {"condition": "DES >= TAM o FUE >= TAM (o iguales)", "value": 8},
+        {"condition": "DES > TAM y FUE > TAM", "value": 9}
+      ],
+      "age_penalty_by_decade": {
+        "40s": -1,
+        "50s": -2,
+        "60s": -3,
+        "70s": -4,
+        "80s": -5
+      }
+    },
+    "build_and_damage_bonus": {
+      "by_sum_FUE_TAM": [
+        {"min": 2, "max": 64, "damage_bonus": "-2", "build": -2},
+        {"min": 65, "max": 84, "damage_bonus": "-1", "build": -1},
+        {"min": 85, "max": 124, "damage_bonus": "0", "build": 0},
+        {"min": 125, "max": 164, "damage_bonus": "+1D4", "build": 1},
+        {"min": 165, "max": 204, "damage_bonus": "+1D6", "build": 2},
+        {"min": 205, "max": 284, "damage_bonus": "+2D6", "build": 3},
+        {"min": 285, "max": 364, "damage_bonus": "+3D6", "build": 4},
+        {"min": 365, "max": 444, "damage_bonus": "+4D6", "build": 5},
+        {"min": 445, "max": 524, "damage_bonus": "+5D6", "build": 6}
+      ],
+      "overflow_rule": "Por cada +80 puntos (o fraccion) por encima de 524: +1D6 de dano y +1 Build."
+    }
+  },
+  "skill_point_rules": {
+    "occupation_points": "segun formula de ocupacion",
+    "personal_interest_points": "INT x2",
+    "cannot_allocate_to": ["Mitos de Cthulhu (en creacion inicial)"]
+  },
+  "computed_fractions": {
+    "hard": "floor(valor/2)",
+    "extreme": "floor(valor/5)"
+  }
+}

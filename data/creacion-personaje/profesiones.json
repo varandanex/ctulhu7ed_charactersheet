@@ -1,0 +1,294 @@
+{
+  "version": "coc7-es",
+  "source": "ocupaciones de ejemplo (Manual del Guardian, Capitulo 3, pags. 42-43)",
+  "interpersonal_skill_options": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"],
+  "occupations": [
+    {
+      "name": "Abogado",
+      "tags": [],
+      "credit_range": "30-80",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Buscar libros", "Contabilidad", "Derecho", "Psicologia"],
+      "choice_groups": [
+        {"count": 2, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonales"},
+        {"count": 2, "from": ["cualquiera"], "label": "libres"}
+      ]
+    },
+    {
+      "name": "Agente de policia",
+      "tags": [],
+      "credit_range": "9-30",
+      "occupation_points_formula": "EDU x2 + (DES x2 o FUE x2)",
+      "skills": ["Armas de fuego", "Combatir (Pelea)", "Derecho", "Descubrir", "Primeros auxilios", "Psicologia"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 1, "from": ["Conducir automovil", "Equitacion"], "label": "especialidad personal"}
+      ]
+    },
+    {
+      "name": "Atleta profesional",
+      "tags": [],
+      "credit_range": "9-70",
+      "occupation_points_formula": "EDU x2 + (DES x2 o FUE x2)",
+      "skills": ["Combatir (Pelea)", "Equitacion", "Lanzar", "Nadar", "Saltar", "Trepar"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 1, "from": ["cualquiera"], "label": "libre"}
+      ]
+    },
+    {
+      "name": "Anticuario",
+      "tags": ["lovecraftiana"],
+      "credit_range": "30-70",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Arte/Artesania (cualquiera)", "Buscar libros", "Descubrir", "Historia", "Otras lenguas", "Tasacion"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 1, "from": ["cualquiera"], "label": "libre"}
+      ]
+    },
+    {
+      "name": "Artista",
+      "tags": [],
+      "credit_range": "9-50",
+      "occupation_points_formula": "EDU x2 + (POD x2 o DES x2)",
+      "skills": ["Arte/Artesania (cualquiera)", "Descubrir", "Historia o Naturaleza", "Otras lenguas", "Psicologia"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 2, "from": ["cualquiera"], "label": "libres"}
+      ]
+    },
+    {
+      "name": "Bibliotecario",
+      "tags": ["lovecraftiana"],
+      "credit_range": "9-35",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Buscar libros", "Contabilidad", "Lengua propia", "Otras lenguas"],
+      "choice_groups": [
+        {"count": 4, "from": ["especialidades personales o lecturas especializadas"], "label": "especialidades"}
+      ]
+    },
+    {
+      "name": "Clerigo",
+      "tags": [],
+      "credit_range": "9-60",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Buscar libros", "Contabilidad", "Escuchar", "Historia", "Otras lenguas", "Psicologia"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 1, "from": ["cualquiera"], "label": "libre"}
+      ]
+    },
+    {
+      "name": "Criminal",
+      "tags": [],
+      "credit_range": "5-65",
+      "occupation_points_formula": "EDU x2 + (DES x2 o FUE x2)",
+      "skills": ["Descubrir", "Psicologia", "Sigilo"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 4, "from": ["Armas de fuego", "Cerrajeria", "Combatir", "Disfrazarse", "Juego de manos", "Mecanica", "Tasacion"], "label": "especialidades criminales"}
+      ]
+    },
+    {
+      "name": "Diletante",
+      "tags": ["lovecraftiana"],
+      "credit_range": "50-99",
+      "occupation_points_formula": "EDU x2 + APA x2",
+      "skills": ["Armas de fuego", "Arte/Artesania (cualquiera)", "Equitacion", "Otras lenguas"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 3, "from": ["cualquiera"], "label": "libres"}
+      ]
+    },
+    {
+      "name": "Escritor",
+      "tags": ["lovecraftiana"],
+      "credit_range": "9-30",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Arte (Literatura)", "Buscar libros", "Historia", "Lengua propia", "Naturaleza o Ciencias", "Otras lenguas", "Psicologia"],
+      "choice_groups": [{"count": 1, "from": ["cualquiera"], "label": "libre"}]
+    },
+    {
+      "name": "Fanatico",
+      "tags": [],
+      "credit_range": "0-30",
+      "occupation_points_formula": "EDU x2 + (APA x2 o POD x2)",
+      "skills": ["Historia", "Psicologia", "Sigilo"],
+      "choice_groups": [
+        {"count": 2, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonales"},
+        {"count": 3, "from": ["cualquiera"], "label": "libres"}
+      ]
+    },
+    {
+      "name": "Granjero",
+      "tags": [],
+      "credit_range": "9-30",
+      "occupation_points_formula": "EDU x2 + (DES x2 o FUE x2)",
+      "skills": ["Arte/Artesania (Agricultura)", "Conducir automovil (o camioneta)", "Conducir maquinaria", "Mecanica", "Naturaleza", "Seguir rastros"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 1, "from": ["cualquiera"], "label": "libre"}
+      ]
+    },
+    {
+      "name": "Ingeniero",
+      "tags": [],
+      "credit_range": "30-60",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Arte/Artesania (Dibujo tecnico)", "Buscar libros", "Ciencia (Ingenieria)", "Ciencia (Fisica)", "Conducir maquinaria", "Electricidad", "Mecanica"],
+      "choice_groups": [{"count": 1, "from": ["cualquiera"], "label": "libre"}]
+    },
+    {
+      "name": "Inspector de policia",
+      "tags": ["lovecraftiana"],
+      "credit_range": "20-50",
+      "occupation_points_formula": "EDU x2 + (DES x2 o FUE x2)",
+      "skills": ["Armas de fuego", "Arte/Artesania (Interpretacion) o Disfrazarse", "Derecho", "Descubrir", "Escuchar", "Psicologia"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 1, "from": ["cualquiera"], "label": "libre"}
+      ]
+    },
+    {
+      "name": "Interprete",
+      "tags": [],
+      "credit_range": "9-70",
+      "occupation_points_formula": "EDU x2 + APA x2",
+      "skills": ["Arte/Artesania (Interpretacion)", "Disfrazarse", "Escuchar", "Psicologia"],
+      "choice_groups": [
+        {"count": 2, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonales"},
+        {"count": 2, "from": ["cualquiera"], "label": "libres"}
+      ]
+    },
+    {
+      "name": "Investigador privado",
+      "tags": [],
+      "credit_range": "9-30",
+      "occupation_points_formula": "EDU x2 + (DES x2 o FUE x2)",
+      "skills": ["Arte/Artesania (Fotografia)", "Buscar libros", "Derecho", "Descubrir", "Disfrazarse", "Psicologia"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 1, "from": ["cualquiera (ej: Informatica, Cerrajeria o Armas de fuego)"], "label": "libre"}
+      ]
+    },
+    {
+      "name": "Medico",
+      "tags": ["lovecraftiana"],
+      "credit_range": "30-80",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Ciencia (Biologia)", "Ciencia (Farmacologia)", "Medicina", "Otras lenguas (latin)", "Primeros auxilios", "Psicologia"],
+      "choice_groups": [
+        {"count": 2, "from": ["especialidades personales o academicas"], "label": "especialidades"}
+      ]
+    },
+    {
+      "name": "Miembro de una tribu",
+      "tags": [],
+      "credit_range": "0-15",
+      "occupation_points_formula": "EDU x2 + (DES x2 o FUE x2)",
+      "skills": ["Ciencias ocultas", "Combatir o Lanzar", "Descubrir", "Escuchar", "Naturaleza", "Supervivencia (cualquiera)", "Trepar"],
+      "choice_groups": []
+    },
+    {
+      "name": "Misionero",
+      "tags": [],
+      "credit_range": "0-30",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Arte/Artesania", "Medicina", "Mecanica", "Naturaleza"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 2, "from": ["cualquiera"], "label": "libres"}
+      ]
+    },
+    {
+      "name": "Musico",
+      "tags": [],
+      "credit_range": "9-30",
+      "occupation_points_formula": "EDU x2 + (DES x2 o POD x2)",
+      "skills": ["Arte/Artesania (Instrumento)", "Escuchar", "Psicologia"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 4, "from": ["cualquiera"], "label": "libres"}
+      ]
+    },
+    {
+      "name": "Oficial militar",
+      "tags": [],
+      "credit_range": "20-70",
+      "occupation_points_formula": "EDU x2 + (DES x2 o FUE x2)",
+      "skills": ["Armas de fuego", "Contabilidad", "Orientarse", "Psicologia", "Supervivencia"],
+      "choice_groups": [
+        {"count": 2, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonales"},
+        {"count": 1, "from": ["cualquiera"], "label": "libre"}
+      ]
+    },
+    {
+      "name": "Parapsicologo",
+      "tags": [],
+      "credit_range": "9-30",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Antropologia", "Arte/Artesania (Fotografia)", "Buscar libros", "Ciencias ocultas", "Historia", "Otras lenguas", "Psicologia"],
+      "choice_groups": [{"count": 1, "from": ["cualquiera"], "label": "libre"}]
+    },
+    {
+      "name": "Periodista",
+      "tags": ["lovecraftiana"],
+      "credit_range": "9-30",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Arte/Artesania (Fotografia)", "Buscar libros", "Historia", "Lengua propia", "Psicologia"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 2, "from": ["cualquiera"], "label": "libres"}
+      ]
+    },
+    {
+      "name": "Piloto",
+      "tags": [],
+      "credit_range": "20-70",
+      "occupation_points_formula": "EDU x2 + DES x2",
+      "skills": ["Ciencia (Astronomia)", "Conducir maquinaria", "Electricidad", "Mecanica", "Orientarse", "Pilotar (aeronave)"],
+      "choice_groups": [{"count": 2, "from": ["cualquiera"], "label": "libres"}]
+    },
+    {
+      "name": "Pirata informatico",
+      "tags": ["actual"],
+      "credit_range": "10-70",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Buscar libros", "Descubrir", "Electricidad", "Electronica", "Informatica"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 2, "from": ["cualquiera"], "label": "libres"}
+      ]
+    },
+    {
+      "name": "Profesor de universidad",
+      "tags": ["lovecraftiana"],
+      "credit_range": "20-70",
+      "occupation_points_formula": "EDU x4",
+      "skills": ["Buscar libros", "Lengua propia", "Otras lenguas", "Psicologia"],
+      "choice_groups": [{"count": 4, "from": ["especialidades personales o academicas"], "label": "especialidades"}]
+    },
+    {
+      "name": "Soldado",
+      "tags": [],
+      "credit_range": "9-30",
+      "occupation_points_formula": "EDU x2 + (DES x2 o FUE x2)",
+      "skills": ["Armas de fuego", "Combatir", "Esquivar", "Sigilo", "Supervivencia", "Trepar o Nadar"],
+      "choice_groups": [
+        {"count": 2, "from": ["Mecanica", "Otras lenguas", "Primeros auxilios"], "label": "complementarias"}
+      ]
+    },
+    {
+      "name": "Vagabundo",
+      "tags": [],
+      "credit_range": "0-5",
+      "occupation_points_formula": "EDU x2 + (APA x2 o DES x2 o FUE x2)",
+      "skills": ["Escuchar", "Orientarse", "Saltar", "Sigilo", "Trepar"],
+      "choice_groups": [
+        {"count": 1, "from": ["Charlataneria", "Encanto", "Intimidar", "Persuasion"], "label": "interpersonal"},
+        {"count": 2, "from": ["cualquiera"], "label": "libres"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+playwright-report/
+test-results/
+
+# Environment
+.env*
+!.env.example
+
+# Tooling and local artifacts
+.codex/
+tmp/
+.DS_Store
+.vercel/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local large assets
+La Llamada de Cthulhu (7ª edición) - Manual del Guardián {OCR, marcadores, índice hipervinculado}.pdf
+La Llamada de Cthulhu*.pdf

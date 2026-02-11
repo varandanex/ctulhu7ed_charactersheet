@@ -2,6 +2,10 @@
 
 Aplicacion web para facilitar la creacion de hojas de personaje de La Llamada de Cthulhu 7a edicion.
 
+## Requisitos
+- Node.js LTS `24.x` (recomendado `24.13.1`)
+- npm `11.x`
+
 ## Stack
 - Next.js + TypeScript
 - Zustand (estado)
