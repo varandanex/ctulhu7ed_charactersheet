@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type {
+  AgePenaltyAllocation,
   CharacterCompanion,
   CharacterDraft,
   CharacteristicKey,
@@ -16,6 +17,13 @@ const emptyDraft: CharacterDraft = {
   age: 25,
   lastRolledAge: undefined,
   era: "clasica",
+  agePenaltyAllocation: {
+    youthFuePenalty: 2,
+    youthTamPenalty: 3,
+    matureFuePenalty: 1,
+    matureConPenalty: 1,
+    matureDesPenalty: 3,
+  },
   characteristics: {},
   occupation: undefined,
   skills: {
@@ -53,6 +61,7 @@ interface CharacterStore {
   setMode: (mode: CharacterDraft["mode"]) => void;
   setAge: (age: number) => void;
   setEra: (era: string) => void;
+  setAgePenaltyAllocation: (allocation: Partial<AgePenaltyAllocation>) => void;
   rollAllCharacteristics: () => void;
   setCharacteristic: (key: CharacteristicKey, value: number) => void;
   setOccupation: (occupation: OccupationSelection) => void;
@@ -73,12 +82,26 @@ export const useCharacterStore = create<CharacterStore>()(
       setMode: (mode) => set((state) => ({ draft: { ...state.draft, mode } })),
       setAge: (age) => set((state) => ({ draft: { ...state.draft, age } })),
       setEra: (era) => set((state) => ({ draft: { ...state.draft, era } })),
+      setAgePenaltyAllocation: (allocation) =>
+        set((state) => ({
+          draft: {
+            ...state.draft,
+            agePenaltyAllocation: {
+              ...state.draft.agePenaltyAllocation,
+              ...allocation,
+            },
+          },
+        })),
       rollAllCharacteristics: () =>
         set((state) => ({
           draft: {
             ...state.draft,
             lastRolledAge: state.draft.age,
-            characteristics: applyAgeModifiers(rollCharacteristics(), state.draft.age),
+            characteristics: applyAgeModifiers(
+              rollCharacteristics(),
+              state.draft.age,
+              state.draft.agePenaltyAllocation,
+            ),
           },
         })),
       setCharacteristic: (key, value) =>

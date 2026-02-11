@@ -39,6 +39,13 @@ export function toPrintablePdfModel(sheet: CharacterSheet): PrintableCharacterMo
           .join(", "),
       },
       {
+        label: "Habilidades (totales)",
+        value: Object.entries(sheet.computedSkills)
+          .filter(([, value]) => value.total > 0)
+          .map(([key, value]) => `${key}: ${value.total} (${value.hard}/${value.extreme})`)
+          .join(" | "),
+      },
+      {
         label: "Trasfondo",
         value: Object.values(sheet.background)
           .filter(Boolean)

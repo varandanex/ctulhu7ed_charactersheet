@@ -1,4 +1,4 @@
-import { professionCatalog, rulesCatalog } from "@/rules-data/catalog";
+import { investigatorSkillsCatalog, professionCatalog, rulesCatalog } from "@/rules-data/catalog";
 import {
   isAllowedOccupationSkill,
   isCharacteristicToken,
@@ -6,24 +6,21 @@ import {
   validateChoiceSelections,
 } from "@/domain/occupation";
 import type {
+  AgePenaltyAllocation,
   CharacterDraft,
   CharacterSheet,
   Characteristics,
   DerivedStats,
+  SkillComputedValue,
   ValidationIssue,
 } from "@/domain/types";
 
-const characteristicKeys = [
-  "FUE",
-  "CON",
-  "TAM",
-  "DES",
-  "APA",
-  "INT",
-  "POD",
-  "EDU",
-  "SUERTE",
-] as const;
+const characteristicKeys = ["FUE", "CON", "TAM", "DES", "APA", "INT", "POD", "EDU", "SUERTE"] as const;
+
+export interface OccupationFormulaChoiceGroup {
+  key: string;
+  options: string[];
+}
 
 function rollDice(times: number, sides: number): number {
   let total = 0;
@@ -48,24 +45,78 @@ function evaluateRollFormula(formula: string): number {
   return (rollDice(groupedTimes, groupedSides) + groupedAdd) * multiplier;
 }
 
-export function rollCharacteristics(): Characteristics {
-  const generation = rulesCatalog.characteristics_generation;
-  return {
-    FUE: evaluateRollFormula(generation.FUE),
-    CON: evaluateRollFormula(generation.CON),
-    TAM: evaluateRollFormula(generation.TAM),
-    DES: evaluateRollFormula(generation.DES),
-    APA: evaluateRollFormula(generation.APA),
-    INT: evaluateRollFormula(generation.INT),
-    POD: evaluateRollFormula(generation.POD),
-    EDU: evaluateRollFormula(generation.EDU),
-    SUERTE: evaluateRollFormula(generation.SUERTE),
-  };
+function stripOuterParentheses(input: string): string {
+  let value = input;
+  while (value.startsWith("(") && value.endsWith(")")) {
+    let depth = 0;
+    let wrapsAll = true;
+    for (let i = 0; i < value.length; i += 1) {
+      const char = value[i];
+      if (char === "(") depth += 1;
+      if (char === ")") depth -= 1;
+      if (depth === 0 && i < value.length - 1) {
+        wrapsAll = false;
+        break;
+      }
+    }
+    if (!wrapsAll) break;
+    value = value.slice(1, -1);
+  }
+  return value;
 }
 
-function parseRangeLabel(label: string): { min: number; max: number } {
-  const [min, max] = label.split("-").map((chunk) => Number(chunk.trim()));
-  return { min, max };
+function splitAtTopLevel(input: string, separator: "+" | "O"): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i];
+    if (char === "(") {
+      depth += 1;
+      current += char;
+      continue;
+    }
+    if (char === ")") {
+      depth -= 1;
+      current += char;
+      continue;
+    }
+
+    if (depth === 0 && char === separator) {
+      if (separator === "O") {
+        const prev = input[i - 1] ?? "";
+        const next = input[i + 1] ?? "";
+        const canSplit = (/\d|\)/.test(prev) && /[A-Z(]/.test(next)) || (/[A-Z]/.test(prev) && next === "(");
+        if (!canSplit) {
+          current += char;
+          continue;
+        }
+      }
+      parts.push(current);
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  parts.push(current);
+  return parts.filter((part) => part.length > 0);
+}
+
+function clampPenaltyAllocation(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(value));
+}
+
+function getMaturePenaltyTotal(age: number): number {
+  if (age >= 80) return 80;
+  if (age >= 70) return 40;
+  if (age >= 60) return 20;
+  if (age >= 50) return 10;
+  if (age >= 40) return 5;
+  return 0;
 }
 
 function getBuildAndDamageBonus(sumFueTam: number): { build: number; damageBonus: string } {
@@ -119,38 +170,137 @@ function applyEduImprovements(currentEdu: number, age: number): number {
   return edu;
 }
 
-export function applyAgeModifiers(base: Characteristics, age: number): Characteristics {
+function getDefaultAgePenaltyAllocation(age: number): AgePenaltyAllocation {
+  const youthPenalty = 5;
+  const youthFuePenalty = Math.floor(youthPenalty / 2);
+  const youthTamPenalty = youthPenalty - youthFuePenalty;
+
+  const maturePenalty = getMaturePenaltyTotal(age);
+  const matureFuePenalty = Math.floor(maturePenalty / 3);
+  const matureConPenalty = Math.floor(maturePenalty / 3);
+  const matureDesPenalty = maturePenalty - matureFuePenalty - matureConPenalty;
+
+  return {
+    youthFuePenalty,
+    youthTamPenalty,
+    matureFuePenalty,
+    matureConPenalty,
+    matureDesPenalty,
+  };
+}
+
+export function extractOccupationFormulaChoiceGroups(formula: string): OccupationFormulaChoiceGroup[] {
+  const normalized = formula.toUpperCase().replace(/\s+/g, "");
+  const groups: OccupationFormulaChoiceGroup[] = [];
+
+  let depth = 0;
+  let groupStart = -1;
+
+  for (let i = 0; i < normalized.length; i += 1) {
+    const char = normalized[i];
+
+    if (char === "(") {
+      if (depth === 0) {
+        groupStart = i;
+      }
+      depth += 1;
+      continue;
+    }
+
+    if (char === ")") {
+      depth -= 1;
+      if (depth === 0 && groupStart >= 0) {
+        const fullGroup = normalized.slice(groupStart + 1, i);
+        const options = splitAtTopLevel(fullGroup, "O");
+        if (options.length > 1) {
+          groups.push({
+            key: `choice_${groups.length}`,
+            options,
+          });
+        }
+        groupStart = -1;
+      }
+    }
+  }
+
+  return groups;
+}
+
+function getSelectedFormulaOption(
+  groupKey: string,
+  options: string[],
+  formulaChoices?: Record<string, string>,
+): string {
+  const selected = (formulaChoices?.[groupKey] ?? "").toUpperCase().replace(/\s+/g, "");
+  if (selected.length > 0 && options.includes(selected)) {
+    return selected;
+  }
+  return options[0];
+}
+
+export function rollCharacteristics(): Characteristics {
+  const generation = rulesCatalog.characteristics_generation;
+  return {
+    FUE: evaluateRollFormula(generation.FUE),
+    CON: evaluateRollFormula(generation.CON),
+    TAM: evaluateRollFormula(generation.TAM),
+    DES: evaluateRollFormula(generation.DES),
+    APA: evaluateRollFormula(generation.APA),
+    INT: evaluateRollFormula(generation.INT),
+    POD: evaluateRollFormula(generation.POD),
+    EDU: evaluateRollFormula(generation.EDU),
+    SUERTE: evaluateRollFormula(generation.SUERTE),
+  };
+}
+
+function parseCreditRange(range: string): { min: number; max: number } {
+  const [min, max] = range.split("-").map((n) => Number(n.trim()));
+  return { min, max };
+}
+
+function isCreditSkill(skill: string): boolean {
+  return normalizeSkillName(skill) === "credito";
+}
+
+export function applyAgeModifiers(
+  base: Characteristics,
+  age: number,
+  allocation: AgePenaltyAllocation = getDefaultAgePenaltyAllocation(age),
+): Characteristics {
   const result = { ...base };
+  const fallback = getDefaultAgePenaltyAllocation(age);
 
   if (age >= 15 && age <= 19) {
     result.EDU = Math.max(1, result.EDU - 5);
-    const reduction = 5;
-    const fueReduction = Math.floor(reduction / 2);
-    const tamReduction = reduction - fueReduction;
-    result.FUE = Math.max(1, result.FUE - fueReduction);
-    result.TAM = Math.max(1, result.TAM - tamReduction);
+
+    const youthFue = clampPenaltyAllocation(allocation.youthFuePenalty);
+    const youthTam = clampPenaltyAllocation(allocation.youthTamPenalty);
+    const youthTotal = youthFue + youthTam;
+
+    const fuePenalty = youthTotal === 5 ? youthFue : fallback.youthFuePenalty;
+    const tamPenalty = youthTotal === 5 ? youthTam : fallback.youthTamPenalty;
+
+    result.FUE = Math.max(1, result.FUE - fuePenalty);
+    result.TAM = Math.max(1, result.TAM - tamPenalty);
+
+    // Regla 15-19: tirar Suerte dos veces y conservar la mayor.
     result.SUERTE = Math.max(result.SUERTE, evaluateRollFormula("3D6x5"));
   }
 
-  if (age >= 40) {
-    const decadePenaltyMap: Array<[number, number]> = [
-      [40, 5],
-      [50, 10],
-      [60, 20],
-      [70, 40],
-      [80, 80],
-    ];
-    const totalPenalty = decadePenaltyMap.reduce((acc, [threshold, value]) => {
-      if (age >= threshold) {
-        return value;
-      }
-      return acc;
-    }, 0);
+  const matureTotalRequired = getMaturePenaltyTotal(age);
+  if (matureTotalRequired > 0) {
+    const matureFue = clampPenaltyAllocation(allocation.matureFuePenalty);
+    const matureCon = clampPenaltyAllocation(allocation.matureConPenalty);
+    const matureDes = clampPenaltyAllocation(allocation.matureDesPenalty);
+    const matureTotal = matureFue + matureCon + matureDes;
 
-    const perStatPenalty = Math.floor(totalPenalty / 3);
-    result.FUE = Math.max(1, result.FUE - perStatPenalty);
-    result.CON = Math.max(1, result.CON - perStatPenalty);
-    result.DES = Math.max(1, result.DES - (totalPenalty - perStatPenalty * 2));
+    const fuePenalty = matureTotal === matureTotalRequired ? matureFue : fallback.matureFuePenalty;
+    const conPenalty = matureTotal === matureTotalRequired ? matureCon : fallback.matureConPenalty;
+    const desPenalty = matureTotal === matureTotalRequired ? matureDes : fallback.matureDesPenalty;
+
+    result.FUE = Math.max(1, result.FUE - fuePenalty);
+    result.CON = Math.max(1, result.CON - conPenalty);
+    result.DES = Math.max(1, result.DES - desPenalty);
 
     const apaPenalty = age >= 80 ? 25 : age >= 70 ? 20 : age >= 60 ? 15 : age >= 50 ? 10 : 5;
     result.APA = Math.max(1, result.APA - apaPenalty);
@@ -199,74 +349,15 @@ export function computeDerivedStats(characteristics: Characteristics, age: numbe
   };
 }
 
-function parseCreditRange(range: string): { min: number; max: number } {
-  const [min, max] = range.split("-").map((n) => Number(n.trim()));
-  return { min, max };
-}
-
-function isCreditSkill(skill: string): boolean {
-  return normalizeSkillName(skill) === "credito";
-}
-
-export function evaluateOccupationPointsFormula(formula: string, characteristics: Characteristics): number {
+export function evaluateOccupationPointsFormula(
+  formula: string,
+  characteristics: Characteristics,
+  formulaChoices?: Record<string, string>,
+): number {
   const normalized = formula.toUpperCase().replace(/\s+/g, "");
+  const choiceGroups = extractOccupationFormulaChoiceGroups(formula);
 
-  function stripOuterParentheses(input: string): string {
-    let value = input;
-    while (value.startsWith("(") && value.endsWith(")")) {
-      let depth = 0;
-      let wrapsAll = true;
-      for (let i = 0; i < value.length; i += 1) {
-        const char = value[i];
-        if (char === "(") depth += 1;
-        if (char === ")") depth -= 1;
-        if (depth === 0 && i < value.length - 1) {
-          wrapsAll = false;
-          break;
-        }
-      }
-      if (!wrapsAll) break;
-      value = value.slice(1, -1);
-    }
-    return value;
-  }
-
-  function splitAtTopLevel(input: string, separator: "+" | "O"): string[] {
-    const parts: string[] = [];
-    let depth = 0;
-    let current = "";
-    for (let i = 0; i < input.length; i += 1) {
-      const char = input[i];
-      if (char === "(") {
-        depth += 1;
-        current += char;
-        continue;
-      }
-      if (char === ")") {
-        depth -= 1;
-        current += char;
-        continue;
-      }
-      if (depth === 0 && char === separator) {
-        if (separator === "O") {
-          const prev = input[i - 1] ?? "";
-          const next = input[i + 1] ?? "";
-          const canSplit = (/\d|\)/.test(prev) && /[A-Z(]/.test(next)) || (/[A-Z]/.test(prev) && next === "(");
-          if (!canSplit) {
-            current += char;
-            continue;
-          }
-        }
-        parts.push(current);
-        current = "";
-        continue;
-      }
-      current += char;
-    }
-    parts.push(current);
-    return parts.filter((part) => part.length > 0);
-  }
-
+  let nextChoiceIndex = 0;
   function evaluateToken(token: string): number {
     const cleaned = stripOuterParentheses(token);
 
@@ -277,7 +368,10 @@ export function evaluateOccupationPointsFormula(formula: string, characteristics
 
     const optionParts = splitAtTopLevel(cleaned, "O");
     if (optionParts.length > 1) {
-      return Math.max(...optionParts.map((part) => evaluateToken(part)));
+      const group = choiceGroups[nextChoiceIndex];
+      nextChoiceIndex += 1;
+      const selectedOption = getSelectedFormulaOption(group?.key ?? "", optionParts, formulaChoices);
+      return evaluateToken(selectedOption);
     }
 
     const multMatch = cleaned.match(/^([A-Z]+)X(\d+)$/);
@@ -298,6 +392,117 @@ export function evaluateOccupationPointsFormula(formula: string, characteristics
   }
 
   return evaluateToken(normalized);
+}
+
+function normalizeFormulaOptionDisplay(option: string): string {
+  return option.replace(/X/g, " x ");
+}
+
+function getBaseSkillValue(skill: string, characteristics: Characteristics): number {
+  const normalized = normalizeSkillName(skill);
+
+  if (normalized === "lengua propia" || normalized.startsWith("lengua propia (")) return characteristics.EDU;
+  if (normalized === "esquivar") return Math.floor(characteristics.DES / 2);
+
+  if (normalized === "armas de fuego (arma corta)") return 20;
+  if (normalized === "armas de fuego (fusil/escopeta)") return 25;
+  if (normalized === "combatir (pelea)") return 25;
+
+  if (normalized === "antropologia") return 1;
+  if (normalized === "arqueologia") return 1;
+  if (normalized === "buscar libros") return 20;
+  if (normalized === "cerrajeria") return 1;
+  if (normalized === "charlataneria") return 5;
+  if (normalized === "ciencias ocultas") return 5;
+  if (normalized === "conducir automovil") return 20;
+  if (normalized === "conducir maquinaria") return 1;
+  if (normalized === "contabilidad") return 5;
+  if (normalized === "credito") return 0;
+  if (normalized === "derecho") return 5;
+  if (normalized === "descubrir") return 25;
+  if (normalized === "disfrazarse") return 5;
+  if (normalized === "electricidad") return 10;
+  if (normalized === "encanto") return 15;
+  if (normalized === "equitacion") return 5;
+  if (normalized === "escuchar") return 20;
+  if (normalized === "historia") return 5;
+  if (normalized === "intimidar") return 15;
+  if (normalized === "juego de manos") return 10;
+  if (normalized === "lanzar") return 20;
+  if (normalized === "mecanica") return 10;
+  if (normalized === "medicina") return 1;
+  if (normalized === "mitos de cthulhu") return 0;
+  if (normalized === "nadar") return 20;
+  if (normalized === "naturaleza") return 10;
+  if (normalized === "orientarse") return 5;
+  if (normalized === "persuasion") return 10;
+  if (normalized === "primeros auxilios") return 30;
+  if (normalized === "psicoanalisis") return 1;
+  if (normalized === "psicologia") return 10;
+  if (normalized === "saltar") return 20;
+  if (normalized === "seguir rastros") return 10;
+  if (normalized === "sigilo") return 20;
+  if (normalized === "tasacion") return 5;
+  if (normalized === "trepar") return 20;
+
+  if (normalized.startsWith("arte/artesania")) return 5;
+  if (normalized.startsWith("ciencia")) return 1;
+  if (normalized.startsWith("armas de fuego")) return 0;
+  if (normalized.startsWith("combatir")) return 0;
+  if (normalized.startsWith("otras lenguas")) return 1;
+  if (normalized.startsWith("pilotar")) return 1;
+  if (normalized.startsWith("supervivencia")) return 10;
+
+  return 0;
+}
+
+function buildSkillPointsMap(pointsBySkill: Record<string, number>): Record<string, number> {
+  return Object.entries(pointsBySkill).reduce(
+    (acc, [skill, points]) => {
+      const key = normalizeSkillName(skill);
+      acc[key] = (acc[key] ?? 0) + points;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+}
+
+export function computeSkillBreakdown(
+  characteristics: Characteristics,
+  skills: CharacterDraft["skills"],
+): Record<string, SkillComputedValue> {
+  const occupationMap = buildSkillPointsMap(skills.occupation);
+  const personalMap = buildSkillPointsMap(skills.personal);
+
+  const catalogSkills = investigatorSkillsCatalog.skills;
+  const assignedSkills = [...Object.keys(skills.occupation), ...Object.keys(skills.personal)];
+
+  const canonicalByNormalized = new Map<string, string>();
+  for (const skill of [...catalogSkills, ...assignedSkills]) {
+    const normalized = normalizeSkillName(skill);
+    if (!canonicalByNormalized.has(normalized)) {
+      canonicalByNormalized.set(normalized, skill);
+    }
+  }
+
+  const computed: Record<string, SkillComputedValue> = {};
+  for (const [normalized, skill] of canonicalByNormalized.entries()) {
+    const occupation = occupationMap[normalized] ?? 0;
+    const personal = personalMap[normalized] ?? 0;
+    const base = getBaseSkillValue(skill, characteristics);
+    const total = base + occupation + personal;
+
+    computed[skill] = {
+      base,
+      occupation,
+      personal,
+      total,
+      hard: Math.floor(total / 2),
+      extreme: Math.floor(total / 5),
+    };
+  }
+
+  return computed;
 }
 
 export function validateSkillAllocation(
@@ -362,10 +567,10 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
   const issues: ValidationIssue[] = [];
 
   if (stepId >= 1) {
-    if (draft.age < 15 || draft.age > 90) {
+    if (draft.age < 15 || draft.age > 89) {
       issues.push({
         code: "AGE_RANGE",
-        message: "Edad fuera de 15-90. Requiere confirmacion del guardian.",
+        message: "Edad fuera de 15-89. Requiere confirmacion del guardian.",
         field: "age",
         severity: "warning",
       });
@@ -432,6 +637,19 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
             severity: "error",
           });
         }
+
+        const formulaChoiceGroups = extractOccupationFormulaChoiceGroups(occupation.occupation_points_formula);
+        for (const group of formulaChoiceGroups) {
+          const selected = (draft.occupation.formulaChoices?.[group.key] ?? "").toUpperCase().replace(/\s+/g, "");
+          if (!group.options.includes(selected)) {
+            issues.push({
+              code: "OCCUPATION_FORMULA_CHOICE",
+              message: `Debes elegir una opcion para la formula de puntos (${normalizeFormulaOptionDisplay(group.options.join(" o "))}).`,
+              field: `occupation.formulaChoices.${group.key}`,
+              severity: "error",
+            });
+          }
+        }
       }
     }
   }
@@ -442,6 +660,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
       const occupationPoints = evaluateOccupationPointsFormula(
         occupationDef.occupation_points_formula,
         draft.characteristics,
+        draft.occupation.formulaChoices,
       );
       const personalPoints = draft.characteristics.INT * 2;
       issues.push(
@@ -469,7 +688,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
   }
 
   if (stepId >= 4) {
-    const requiredBackgroundFields = [
+    const backgroundFields = [
       draft.background.descripcionPersonal,
       draft.background.ideologiaCreencias,
       draft.background.allegados,
@@ -477,14 +696,58 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
       draft.background.posesionesPreciadas,
       draft.background.rasgos,
     ];
-    const completedBackgroundFields = requiredBackgroundFields.filter((value) => value && value.trim().length > 0).length;
+    const completedBackgroundFields = backgroundFields.filter((value) => value && value.trim().length > 0).length;
 
-    if (completedBackgroundFields < requiredBackgroundFields.length) {
+    if (completedBackgroundFields < 3) {
       issues.push({
         code: "MISSING_BACKGROUND_MINIMUM",
         message:
-          "Completa las 6 categorias principales de trasfondo: descripcion personal, ideologia/creencias, allegados, lugares significativos, posesiones preciadas y rasgos.",
+          "Debes completar al menos 3 categorias de trasfondo (descripcion, ideologia/creencias, allegados, lugares, posesiones o rasgos).",
         field: "background",
+        severity: "error",
+      });
+    }
+
+    if (!draft.background.vinculoPrincipal || draft.background.vinculoPrincipal.trim().length === 0) {
+      issues.push({
+        code: "MISSING_CORE_CONNECTION",
+        message: "Debes indicar el vinculo fundamental del investigador.",
+        field: "background.vinculoPrincipal",
+        severity: "error",
+      });
+    }
+  }
+
+  if (stepId >= 5) {
+    if (!draft.equipment.spendingLevel || draft.equipment.spendingLevel.trim().length === 0) {
+      issues.push({
+        code: "MISSING_SPENDING_LEVEL",
+        message: "Completa el nivel de gasto (Tabla II).",
+        field: "equipment.spendingLevel",
+        severity: "error",
+      });
+    }
+    if (!draft.equipment.cash || draft.equipment.cash.trim().length === 0) {
+      issues.push({
+        code: "MISSING_CASH",
+        message: "Completa el dinero en efectivo (Tabla II).",
+        field: "equipment.cash",
+        severity: "error",
+      });
+    }
+    if (!draft.equipment.assets || draft.equipment.assets.trim().length === 0) {
+      issues.push({
+        code: "MISSING_ASSETS",
+        message: "Completa las propiedades/bienes (Tabla II).",
+        field: "equipment.assets",
+        severity: "error",
+      });
+    }
+    if (!draft.equipment.notes || draft.equipment.notes.trim().length === 0) {
+      issues.push({
+        code: "MISSING_EQUIPMENT_NOTES",
+        message: "Anota armas/equipo/objetos importantes.",
+        field: "equipment.notes",
         severity: "error",
       });
     }
@@ -514,6 +777,7 @@ export function finalizeCharacter(draft: CharacterDraft): CharacterSheet {
     derivedStats: computeDerivedStats(finalizedCharacteristics, draft.age),
     occupation: draft.occupation,
     skills: draft.skills,
+    computedSkills: computeSkillBreakdown(finalizedCharacteristics, draft.skills),
     background: {
       descripcionPersonal: draft.background.descripcionPersonal ?? "",
       ideologiaCreencias: draft.background.ideologiaCreencias ?? "",

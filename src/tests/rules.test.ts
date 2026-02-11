@@ -19,6 +19,13 @@ const sampleCharacteristics: Characteristics = {
   EDU: 80,
   SUERTE: 50,
 };
+const defaultAllocation = {
+  youthFuePenalty: 2,
+  youthTamPenalty: 3,
+  matureFuePenalty: 1,
+  matureConPenalty: 1,
+  matureDesPenalty: 3,
+};
 
 describe("domain rules", () => {
   it("computes derived stats with expected values", () => {
@@ -32,21 +39,27 @@ describe("domain rules", () => {
   });
 
   it("evaluates occupation formulas with options", () => {
-    const pointsA = evaluateOccupationPointsFormula("EDU x2 + (DES x2 o FUE x2)", sampleCharacteristics);
+    const pointsA = evaluateOccupationPointsFormula("EDU x2 + (DES x2 o FUE x2)", sampleCharacteristics, {
+      choice_0: "DESX2",
+    });
     const pointsB = evaluateOccupationPointsFormula("EDU x2 + APA x2", sampleCharacteristics);
 
-    expect(pointsA).toBe(80 * 2 + Math.max(55 * 2, 60 * 2));
+    expect(pointsA).toBe(80 * 2 + 55 * 2);
     expect(pointsB).toBe(80 * 2 + 45 * 2);
   });
 
   it("evaluates formulas with parenthesized first term", () => {
-    const points = evaluateOccupationPointsFormula("(APA x2) + (DES x2 o FUE x2)", sampleCharacteristics);
-    expect(points).toBe(45 * 2 + Math.max(55 * 2, 60 * 2));
+    const points = evaluateOccupationPointsFormula("(APA x2) + (DES x2 o FUE x2)", sampleCharacteristics, {
+      choice_0: "FUEX2",
+    });
+    expect(points).toBe(45 * 2 + 60 * 2);
   });
 
   it("evaluates formulas with three alternative characteristics", () => {
-    const points = evaluateOccupationPointsFormula("EDU x2 + (APA x2 o DES x2 o FUE x2)", sampleCharacteristics);
-    expect(points).toBe(80 * 2 + Math.max(45 * 2, 55 * 2, 60 * 2));
+    const points = evaluateOccupationPointsFormula("EDU x2 + (APA x2 o DES x2 o FUE x2)", sampleCharacteristics, {
+      choice_0: "APAX2",
+    });
+    expect(points).toBe(80 * 2 + 45 * 2);
   });
 
   it("applies EDU improvement rolls for age 20+", () => {
@@ -87,6 +100,7 @@ describe("domain rules", () => {
       mode: "manual",
       age: 25,
       era: "clasica",
+      agePenaltyAllocation: defaultAllocation,
       characteristics: sampleCharacteristics,
       occupation: {
         name: "Abogado",
@@ -96,6 +110,7 @@ describe("domain rules", () => {
           "0:interpersonales": ["Charlataneria", "Encanto"],
           "1:libres": ["Descubrir", "Historia"],
         },
+        formulaChoices: {},
       },
       skills: {
         occupation: {
@@ -123,6 +138,7 @@ describe("domain rules", () => {
       mode: "manual",
       age: 25,
       era: "clasica",
+      agePenaltyAllocation: defaultAllocation,
       characteristics: sampleCharacteristics,
       occupation: {
         name: "Abogado",
@@ -132,6 +148,7 @@ describe("domain rules", () => {
           "0:interpersonales": ["Persuasion", "Encanto"],
           "1:libres": ["Historia", "Descubrir"],
         },
+        formulaChoices: {},
       },
       skills: {
         occupation: {
@@ -154,11 +171,12 @@ describe("domain rules", () => {
     expect(issues.some((issue) => issue.code === "INVALID_OCCUPATION_SKILL")).toBe(true);
   });
 
-  it("requires all six core background categories in step 4", () => {
+  it("requires minimum background and core connection in step 4", () => {
     const draft: CharacterDraft = {
       mode: "manual",
       age: 25,
       era: "clasica",
+      agePenaltyAllocation: defaultAllocation,
       characteristics: sampleCharacteristics,
       occupation: {
         name: "Abogado",
@@ -168,6 +186,7 @@ describe("domain rules", () => {
           "0:interpersonales": ["Persuasion", "Encanto"],
           "1:libres": ["Historia", "Descubrir"],
         },
+        formulaChoices: {},
       },
       skills: {
         occupation: {
@@ -179,9 +198,10 @@ describe("domain rules", () => {
         descripcionPersonal: "Reservado y meticuloso.",
         ideologiaCreencias: "Confia en la ley.",
         allegados: "Su hermana Clara.",
-        lugaresSignificativos: "Despacho del bufete.",
-        posesionesPreciadas: "Reloj familiar.",
+        lugaresSignificativos: "",
+        posesionesPreciadas: "",
         rasgos: "",
+        vinculoPrincipal: "",
       },
       identity: {
         nombre: "",
@@ -194,11 +214,13 @@ describe("domain rules", () => {
     };
 
     const missingCoreFields = validateStep(4, draft);
-    expect(missingCoreFields.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(true);
+    expect(missingCoreFields.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
+    expect(missingCoreFields.some((issue) => issue.code === "MISSING_CORE_CONNECTION")).toBe(true);
 
-    draft.background.rasgos = "Paciente y observador.";
+    draft.background.vinculoPrincipal = "Su hermana Clara";
     const completeBackground = validateStep(4, draft);
     expect(completeBackground.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
+    expect(completeBackground.some((issue) => issue.code === "MISSING_CORE_CONNECTION")).toBe(false);
   });
 
   it("warns when age changes after random roll generation", () => {
@@ -207,6 +229,7 @@ describe("domain rules", () => {
       age: 40,
       lastRolledAge: 25,
       era: "clasica",
+      agePenaltyAllocation: defaultAllocation,
       characteristics: sampleCharacteristics,
       occupation: undefined,
       skills: {

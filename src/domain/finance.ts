@@ -2,19 +2,16 @@ interface CreditFinanceBand {
   min: number;
   max: number;
   spendingLevel: string;
-  cash: string;
-  assets: string;
 }
 
-// Tabla configurable para resumen de ingresos y propiedades segun Credito.
-// Valores orientativos para crear rapidamente el investigador en mesa.
+// Niveles de vida segun el Credito; los importes se consultan en la Tabla II del manual.
 const classicFinanceBands: CreditFinanceBand[] = [
-  { min: 0, max: 0, spendingLevel: "$0.50", cash: "$10", assets: "Sin propiedades" },
-  { min: 1, max: 9, spendingLevel: "$2", cash: "$50", assets: "$500" },
-  { min: 10, max: 49, spendingLevel: "$10", cash: "$250", assets: "$5,000" },
-  { min: 50, max: 89, spendingLevel: "$50", cash: "$1,250", assets: "$50,000" },
-  { min: 90, max: 98, spendingLevel: "$250", cash: "$12,500", assets: "$500,000" },
-  { min: 99, max: 99, spendingLevel: "$500", cash: "$50,000", assets: "$5,000,000" },
+  { min: 0, max: 0, spendingLevel: "Indigente" },
+  { min: 1, max: 9, spendingLevel: "Pobre" },
+  { min: 10, max: 49, spendingLevel: "Medio" },
+  { min: 50, max: 89, spendingLevel: "Adinerado" },
+  { min: 90, max: 98, spendingLevel: "Rico" },
+  { min: 99, max: 99, spendingLevel: "Inmensamente rico" },
 ];
 
 export interface FinanceSnapshot {
@@ -31,7 +28,7 @@ export function getFinanceByCredit(creditRating: number): FinanceSnapshot {
 
   return {
     spendingLevel: band.spendingLevel,
-    cash: band.cash,
-    assets: band.assets,
+    cash: "",
+    assets: "",
   };
 }

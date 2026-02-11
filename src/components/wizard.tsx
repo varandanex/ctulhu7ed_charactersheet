@@ -11,8 +11,10 @@ import {
   getChoiceGroupSkillOptions,
 } from "@/domain/occupation";
 import {
+  computeSkillBreakdown,
   computeDerivedStats,
   evaluateOccupationPointsFormula,
+  extractOccupationFormulaChoiceGroups,
   finalizeCharacter,
   validateStep,
 } from "@/domain/rules";
@@ -44,6 +46,10 @@ function getChoiceKey(index: number, label: string): string {
   return `${index}:${label}`;
 }
 
+function formatFormulaOption(option: string): string {
+  return option.replace(/X/g, " x ");
+}
+
 function Issues({ issues }: { issues: ValidationIssue[] }) {
   if (issues.length === 0) return null;
   return (
@@ -71,6 +77,7 @@ export function Wizard({ step }: { step: number }) {
     setMode,
     setAge,
     setEra,
+    setAgePenaltyAllocation,
     rollAllCharacteristics,
     setCharacteristic,
     setOccupation,
@@ -117,8 +124,20 @@ export function Wizard({ step }: { step: number }) {
 
   const occupationPoints = useMemo(() => {
     if (!occupation || !draft.characteristics.INT) return 0;
-    return evaluateOccupationPointsFormula(occupation.occupation_points_formula, draft.characteristics as any);
-  }, [occupation, draft.characteristics]);
+    return evaluateOccupationPointsFormula(
+      occupation.occupation_points_formula,
+      draft.characteristics as any,
+      draft.occupation?.formulaChoices,
+    );
+  }, [occupation, draft.characteristics, draft.occupation?.formulaChoices]);
+  const occupationFormulaChoices = useMemo(
+    () => (occupation ? extractOccupationFormulaChoiceGroups(occupation.occupation_points_formula) : []),
+    [occupation],
+  );
+  const computedSkills = useMemo(() => {
+    if (!draft.characteristics.INT) return {};
+    return computeSkillBreakdown(draft.characteristics as any, draft.skills);
+  }, [draft.characteristics, draft.skills]);
 
   const personalPoints = (draft.characteristics.INT ?? 0) * 2;
   const financeSnapshot = useMemo(
@@ -199,6 +218,17 @@ export function Wizard({ step }: { step: number }) {
     });
   }
 
+  function setOccupationFormulaChoice(choiceKey: string, selectedOption: string) {
+    if (!draft.occupation) return;
+    setOccupation({
+      ...draft.occupation,
+      formulaChoices: {
+        ...(draft.occupation.formulaChoices ?? {}),
+        [choiceKey]: selectedOption,
+      },
+    });
+  }
+
   function goNext() {
     if (!canContinue) return;
     if (step >= 5) {
@@ -274,8 +304,20 @@ export function Wizard({ step }: { step: number }) {
 
   useEffect(() => {
     if (step !== 2 || !draft.occupation) return;
-    if (Object.keys(draft.occupation.selectedChoices ?? {}).length > 0) return;
+    const selectedOccupation = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
+    if (!selectedOccupation) return;
+    const requiredFormulaChoiceCount = extractOccupationFormulaChoiceGroups(selectedOccupation.occupation_points_formula).length;
+    const hasChoiceGroups = Object.keys(draft.occupation.selectedChoices ?? {}).length > 0;
+    const hasFormulaChoices = Object.keys(draft.occupation.formulaChoices ?? {}).length >= requiredFormulaChoiceCount;
+    if (hasChoiceGroups && hasFormulaChoices) return;
     const selectedChoices = buildDefaultChoiceSelections(draft.occupation.name);
+    const formulaChoices = extractOccupationFormulaChoiceGroups(selectedOccupation.occupation_points_formula).reduce(
+      (acc, group) => {
+        acc[group.key] = group.options[0];
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
     const selectedSkills = collectAllowedOccupationSkills({
       ...draft.occupation,
       selectedChoices,
@@ -284,6 +326,7 @@ export function Wizard({ step }: { step: number }) {
       ...draft.occupation,
       selectedChoices,
       selectedSkills,
+      formulaChoices,
     });
   }, [draft.occupation, setOccupation, step]);
 
@@ -296,6 +339,13 @@ export function Wizard({ step }: { step: number }) {
     const selected = allOccupations[index];
     if (!selected) return;
     const selectedChoices = buildDefaultChoiceSelections(selected.name);
+    const formulaChoices = extractOccupationFormulaChoiceGroups(selected.occupation_points_formula).reduce(
+      (acc, group) => {
+        acc[group.key] = group.options[0];
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
     const selectedSkills = collectAllowedOccupationSkills({
       name: selected.name,
       creditRating: Number(selected.credit_range.split("-")[0]),
@@ -307,6 +357,7 @@ export function Wizard({ step }: { step: number }) {
       creditRating: Number(selected.credit_range.split("-")[0]),
       selectedChoices,
       selectedSkills,
+      formulaChoices,
     });
   }
 
@@ -396,8 +447,8 @@ export function Wizard({ step }: { step: number }) {
               </select>
             </div>
             <div className="card">
-              <label>Edad (15-90)</label>
-              <input type="number" min={15} max={90} value={draft.age} onChange={(e) => setAge(Number(e.target.value))} />
+              <label>Edad (15-89)</label>
+              <input type="number" min={15} max={89} value={draft.age} onChange={(e) => setAge(Number(e.target.value))} />
             </div>
             <div className="card">
               <label>Ambientacion</label>
@@ -412,6 +463,76 @@ export function Wizard({ step }: { step: number }) {
               </button>
               <p className="small">Si usas modo manual, puedes editar cada valor abajo.</p>
             </div>
+            {draft.age >= 15 && draft.age <= 19 && (
+              <div className="card" style={{ gridColumn: "1 / -1" }}>
+                <p className="kpi">Penalizador 15-19 (repartir 5 entre FUE y TAM)</p>
+                <div className="grid two">
+                  <div>
+                    <label>FUE</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={5}
+                      value={draft.agePenaltyAllocation.youthFuePenalty}
+                      onChange={(e) => setAgePenaltyAllocation({ youthFuePenalty: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label>TAM</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={5}
+                      value={draft.agePenaltyAllocation.youthTamPenalty}
+                      onChange={(e) => setAgePenaltyAllocation({ youthTamPenalty: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <p className="small">
+                  Total actual: {draft.agePenaltyAllocation.youthFuePenalty + draft.agePenaltyAllocation.youthTamPenalty} / 5
+                </p>
+              </div>
+            )}
+            {draft.age >= 40 && (
+              <div className="card" style={{ gridColumn: "1 / -1" }}>
+                <p className="kpi">Penalizador fisico por edad (FUE/CON/DES)</p>
+                <div className="grid three">
+                  <div>
+                    <label>FUE</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={draft.agePenaltyAllocation.matureFuePenalty}
+                      onChange={(e) => setAgePenaltyAllocation({ matureFuePenalty: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label>CON</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={draft.agePenaltyAllocation.matureConPenalty}
+                      onChange={(e) => setAgePenaltyAllocation({ matureConPenalty: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <label>DES</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={draft.agePenaltyAllocation.matureDesPenalty}
+                      onChange={(e) => setAgePenaltyAllocation({ matureDesPenalty: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <p className="small">
+                  Total actual:{" "}
+                  {draft.agePenaltyAllocation.matureFuePenalty +
+                    draft.agePenaltyAllocation.matureConPenalty +
+                    draft.agePenaltyAllocation.matureDesPenalty}
+                </p>
+              </div>
+            )}
             {characteristicKeys.map((key) => (
               <div className="card" key={key}>
                 <label>{key}</label>
@@ -590,6 +711,26 @@ export function Wizard({ step }: { step: number }) {
                   <p className="kpi">Habilidades disponibles de ocupacion seleccionada</p>
                   <p>{occupationSkills.join(", ") || "Sin listado"}</p>
                 </div>
+                {occupationFormulaChoices.length > 0 && (
+                  <div className="card" style={{ gridColumn: "1 / -1" }}>
+                    <p className="kpi">Eleccion de formula de puntos</p>
+                    {occupationFormulaChoices.map((choice) => (
+                      <div key={choice.key}>
+                        <label>{choice.options.map((option) => formatFormulaOption(option)).join(" o ")}</label>
+                        <select
+                          value={draft.occupation?.formulaChoices?.[choice.key] ?? choice.options[0]}
+                          onChange={(event) => setOccupationFormulaChoice(choice.key, event.target.value)}
+                        >
+                          {choice.options.map((option) => (
+                            <option value={option} key={option}>
+                              {formatFormulaOption(option)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -656,6 +797,10 @@ export function Wizard({ step }: { step: number }) {
                       />
                     </div>
                   </div>
+                  <p className="small">
+                    Total {computedSkills[skill]?.total ?? 0} | Dificil {computedSkills[skill]?.hard ?? 0} | Extrema{" "}
+                    {computedSkills[skill]?.extreme ?? 0}
+                  </p>
                 </div>
               ))}
               {groupedSkills.personalOnly.length > 0 && (
@@ -686,6 +831,10 @@ export function Wizard({ step }: { step: number }) {
                       onChange={(e) => handleSkillChange("personal", skill, Number(e.target.value))}
                     />
                   </div>
+                  <p className="small">
+                    Total {computedSkills[skill]?.total ?? 0} | Dificil {computedSkills[skill]?.hard ?? 0} | Extrema{" "}
+                    {computedSkills[skill]?.extreme ?? 0}
+                  </p>
                 </div>
               ))}
             </div>
@@ -879,11 +1028,9 @@ export function Wizard({ step }: { step: number }) {
                 className="ghost"
                 onClick={() => {
                   setEquipmentField("spendingLevel", financeSnapshot.spendingLevel);
-                  setEquipmentField("cash", financeSnapshot.cash);
-                  setEquipmentField("assets", financeSnapshot.assets);
                 }}
               >
-                Autocompletar desde Credito
+                Autocompletar nivel de vida
               </button>
               <label>Nivel de gasto</label>
               <input
@@ -895,13 +1042,13 @@ export function Wizard({ step }: { step: number }) {
               <input
                 value={draft.equipment.cash ?? ""}
                 onChange={(e) => setEquipmentField("cash", e.target.value)}
-                placeholder={financeSnapshot.cash}
+                placeholder="Consulta Tabla II del manual"
               />
               <label>Propiedades / bienes</label>
               <input
                 value={draft.equipment.assets ?? ""}
                 onChange={(e) => setEquipmentField("assets", e.target.value)}
-                placeholder={financeSnapshot.assets}
+                placeholder="Consulta Tabla II del manual"
               />
             </div>
             <div className="card">

@@ -11,6 +11,14 @@ export type CharacteristicKey =
 
 export type Characteristics = Record<CharacteristicKey, number>;
 
+export interface AgePenaltyAllocation {
+  youthFuePenalty: number;
+  youthTamPenalty: number;
+  matureFuePenalty: number;
+  matureConPenalty: number;
+  matureDesPenalty: number;
+}
+
 export interface DerivedStats {
   corInicial: number;
   pmInicial: number;
@@ -27,11 +35,21 @@ export interface OccupationSelection {
   creditRating: number;
   selectedSkills: string[];
   selectedChoices?: Record<string, string[]>;
+  formulaChoices?: Record<string, string>;
 }
 
 export interface SkillAllocation {
   occupation: Record<string, number>;
   personal: Record<string, number>;
+}
+
+export interface SkillComputedValue {
+  base: number;
+  occupation: number;
+  personal: number;
+  total: number;
+  hard: number;
+  extreme: number;
 }
 
 export interface CharacterBackground {
@@ -71,6 +89,7 @@ export interface CharacterDraft {
   age: number;
   lastRolledAge?: number;
   era?: string;
+  agePenaltyAllocation: AgePenaltyAllocation;
   characteristics: Partial<Characteristics>;
   occupation?: OccupationSelection;
   skills: SkillAllocation;
@@ -88,6 +107,7 @@ export interface CharacterSheet {
   derivedStats: DerivedStats;
   occupation: OccupationSelection;
   skills: SkillAllocation;
+  computedSkills: Record<string, SkillComputedValue>;
   background: CharacterBackground;
   identity: CharacterIdentity;
   companions: CharacterCompanion[];
