@@ -65,6 +65,10 @@ main {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.grid.three {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
 .card {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -168,6 +172,24 @@ button:disabled {
 .kpi {
   font-size: 0.9rem;
   color: var(--text-muted);
+}
+
+.age-rule-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.age-rule-grid p {
+  margin: 0;
+}
+
+.formula-choice-block {
+  margin: 0 0 10px;
+}
+
+.formula-choice-block:last-child {
+  margin-bottom: 0;
 }
 
 .occupation-carousel {

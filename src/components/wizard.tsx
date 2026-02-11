@@ -50,6 +50,31 @@ function formatFormulaOption(option: string): string {
   return option.replace(/X/g, " x ");
 }
 
+function getMaturePenaltyTarget(age: number): number {
+  if (age >= 80) return 80;
+  if (age >= 70) return 40;
+  if (age >= 60) return 20;
+  if (age >= 50) return 10;
+  if (age >= 40) return 5;
+  return 0;
+}
+
+function getEduImprovementRolls(age: number): number {
+  if (age >= 80) return 4;
+  if (age >= 70) return 4;
+  if (age >= 60) return 4;
+  if (age >= 50) return 3;
+  if (age >= 40) return 2;
+  if (age >= 20) return 1;
+  return 0;
+}
+
+function getTargetState(current: number, expected: number): "ok" | "warn" | "over" {
+  if (current === expected) return "ok";
+  if (current < expected) return "warn";
+  return "over";
+}
+
 function Issues({ issues }: { issues: ValidationIssue[] }) {
   if (issues.length === 0) return null;
   return (
@@ -159,6 +184,16 @@ export function Wizard({ step }: { step: number }) {
   const personalRemaining = personalPoints - personalAssigned;
   const occupationRemainingBudget = Math.max(occupationRemaining, 0);
   const personalRemainingBudget = Math.max(personalRemaining, 0);
+  const youthTarget = draft.age >= 15 && draft.age <= 19 ? 5 : 0;
+  const youthCurrent = draft.agePenaltyAllocation.youthFuePenalty + draft.agePenaltyAllocation.youthTamPenalty;
+  const matureTarget = getMaturePenaltyTarget(draft.age);
+  const matureCurrent =
+    draft.agePenaltyAllocation.matureFuePenalty +
+    draft.agePenaltyAllocation.matureConPenalty +
+    draft.agePenaltyAllocation.matureDesPenalty;
+  const youthState = getTargetState(youthCurrent, youthTarget);
+  const matureState = getTargetState(matureCurrent, matureTarget);
+  const eduImprovementRolls = getEduImprovementRolls(draft.age);
 
   const canContinue = issues.every((issue) => issue.severity !== "error");
 
@@ -463,6 +498,22 @@ export function Wizard({ step }: { step: number }) {
               </button>
               <p className="small">Si usas modo manual, puedes editar cada valor abajo.</p>
             </div>
+            <div className="card" style={{ gridColumn: "1 / -1" }}>
+              <p className="kpi">Reglas activas por edad ({draft.age})</p>
+              <div className="age-rule-grid">
+                <p>
+                  Mejoras de EDU: <strong>{eduImprovementRolls}</strong>
+                </p>
+                <p>
+                  Penalizador MOV por edad: <strong>-{draft.age >= 40 ? Math.min(5, Math.floor(draft.age / 10) - 3) : 0}</strong>
+                </p>
+                {draft.age >= 40 && (
+                  <p>
+                    Penalizador APA: <strong>-{draft.age >= 80 ? 25 : draft.age >= 70 ? 20 : draft.age >= 60 ? 15 : draft.age >= 50 ? 10 : 5}</strong>
+                  </p>
+                )}
+              </div>
+            </div>
             {draft.age >= 15 && draft.age <= 19 && (
               <div className="card" style={{ gridColumn: "1 / -1" }}>
                 <p className="kpi">Penalizador 15-19 (repartir 5 entre FUE y TAM)</p>
@@ -488,7 +539,7 @@ export function Wizard({ step }: { step: number }) {
                     />
                   </div>
                 </div>
-                <p className="small">
+                <p className={`points-state ${youthState}`}>
                   Total actual: {draft.agePenaltyAllocation.youthFuePenalty + draft.agePenaltyAllocation.youthTamPenalty} / 5
                 </p>
               </div>
@@ -525,11 +576,12 @@ export function Wizard({ step }: { step: number }) {
                     />
                   </div>
                 </div>
-                <p className="small">
-                  Total actual:{" "}
+                <p className={`points-state ${matureState}`}>
+                  Total actual:
                   {draft.agePenaltyAllocation.matureFuePenalty +
                     draft.agePenaltyAllocation.matureConPenalty +
                     draft.agePenaltyAllocation.matureDesPenalty}
+                  / {matureTarget}
                 </p>
               </div>
             )}
@@ -714,8 +766,11 @@ export function Wizard({ step }: { step: number }) {
                 {occupationFormulaChoices.length > 0 && (
                   <div className="card" style={{ gridColumn: "1 / -1" }}>
                     <p className="kpi">Eleccion de formula de puntos</p>
+                    <p className="small">
+                      Selecciona la rama exacta que aplica al investigador. No se calcula automaticamente por valor maximo.
+                    </p>
                     {occupationFormulaChoices.map((choice) => (
-                      <div key={choice.key}>
+                      <div key={choice.key} className="formula-choice-block">
                         <label>{choice.options.map((option) => formatFormulaOption(option)).join(" o ")}</label>
                         <select
                           value={draft.occupation?.formulaChoices?.[choice.key] ?? choice.options[0]}
@@ -729,6 +784,10 @@ export function Wizard({ step }: { step: number }) {
                         </select>
                       </div>
                     ))}
+                    <p className="kpi">
+                      Puntos de ocupacion resultantes:{" "}
+                      {draft.characteristics.INT ? occupationPoints : "completa caracteristicas en paso 1 para calcular"}
+                    </p>
                   </div>
                 )}
               </div>
