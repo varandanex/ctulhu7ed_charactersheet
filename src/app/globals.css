@@ -227,6 +227,43 @@ button:disabled {
   font-size: clamp(1.2rem, 2.3vw, 1.55rem);
 }
 
+.occupation-visual {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #3d4f51;
+  min-height: 240px;
+  background: #101818;
+}
+
+.occupation-image {
+  width: 100%;
+  height: clamp(260px, 38vw, 420px);
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  animation: occupation-fade-in 280ms ease-out;
+}
+
+.occupation-image-fallback {
+  min-height: 240px;
+  height: clamp(260px, 38vw, 420px);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(112, 143, 110, 0.22), transparent 45%),
+    radial-gradient(circle at 80% 80%, rgba(221, 160, 87, 0.2), transparent 40%),
+    linear-gradient(145deg, #172022, #11191b);
+}
+
+.occupation-image-fallback p {
+  margin: 0;
+}
+
 .occupation-dots {
   display: flex;
   gap: 8px;
@@ -453,6 +490,17 @@ button:disabled {
 
 .skill-help-sheet p:last-child {
   margin-bottom: 0;
+}
+
+@keyframes occupation-fade-in {
+  from {
+    opacity: 0.35;
+    transform: scale(1.01);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 pre.json {

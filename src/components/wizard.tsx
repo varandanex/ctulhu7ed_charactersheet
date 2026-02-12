@@ -24,6 +24,12 @@ import { useCharacterStore } from "@/state/character-store";
 import { toCharacterJson } from "@/services/export";
 
 const characteristicKeys: CharacteristicKey[] = ["FUE", "CON", "TAM", "DES", "APA", "INT", "POD", "EDU", "SUERTE"];
+const occupationImageOverrides: Record<string, string> = {
+  "Investigador privado": "/ocupaciones/investigador-privado.jpg",
+  Anticuario: "/ocupaciones/anticuario.jpg",
+  "Agente de policia": "/ocupaciones/agente-policia.jpg",
+  "Inspector de policia": "/ocupaciones/inspector-policia.jpg",
+};
 
 function parseCreditRange(range: string): { min: number; max: number } {
   const [min, max] = range.split("-").map((n) => Number(n.trim()));
@@ -36,6 +42,21 @@ function normalizeSkillName(skill: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function toSlug(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function getOccupationImagePath(name: string): string {
+  const override = occupationImageOverrides[name];
+  if (override) return override;
+  return `/ocupaciones/${toSlug(name)}.jpg`;
 }
 
 function isCreditSkill(skill: string): boolean {
@@ -93,6 +114,7 @@ export function Wizard({ step }: { step: number }) {
   const [mobilePointsOpen, setMobilePointsOpen] = useState(false);
   const [helpSkillOpen, setHelpSkillOpen] = useState<string | null>(null);
   const [occupationSlideIndex, setOccupationSlideIndex] = useState(0);
+  const [occupationImageErrors, setOccupationImageErrors] = useState<Record<string, boolean>>({});
   const occupationTouchStartX = useRef<number | null>(null);
   const occupationTouchStartY = useRef<number | null>(null);
   const occupationTouchCurrentX = useRef<number | null>(null);
@@ -130,6 +152,8 @@ export function Wizard({ step }: { step: number }) {
   );
   const activeOccupation = allOccupations[occupationSlideIndex] ?? null;
   const activeOccupationHelp = activeOccupation ? getOccupationHelp(activeOccupation.name) : null;
+  const activeOccupationImage = activeOccupation ? getOccupationImagePath(activeOccupation.name) : null;
+  const activeOccupationImageUnavailable = activeOccupation ? occupationImageErrors[activeOccupation.name] : false;
   const occupationSkills = useMemo(
     () => (draft.occupation ? collectAllowedOccupationSkills(draft.occupation) : []),
     [draft.occupation],
@@ -369,6 +393,14 @@ export function Wizard({ step }: { step: number }) {
     if (occupationSlideIndex < allOccupations.length) return;
     setOccupationSlideIndex(0);
   }, [allOccupations.length, occupationSlideIndex]);
+
+  useEffect(() => {
+    if (step !== 2 || allOccupations.length <= 1) return;
+    const intervalId = window.setInterval(() => {
+      setOccupationSlideIndex((current) => (current + 1) % allOccupations.length);
+    }, 5500);
+    return () => window.clearInterval(intervalId);
+  }, [allOccupations.length, step]);
 
   function applyOccupationBySlide(index: number) {
     const selected = allOccupations[index];
@@ -635,6 +667,29 @@ export function Wizard({ step }: { step: number }) {
                   <button type="button" className="ghost" onClick={goToNextOccupation} aria-label="Ocupacion siguiente">
                     Siguiente
                   </button>
+                </div>
+
+                <div className="occupation-visual">
+                  {!activeOccupationImageUnavailable && activeOccupationImage ? (
+                    <img
+                      key={activeOccupation.name}
+                      src={activeOccupationImage}
+                      alt={`Retrato de ${activeOccupation.name}`}
+                      className="occupation-image"
+                      loading="lazy"
+                      onError={() =>
+                        setOccupationImageErrors((current) => ({
+                          ...current,
+                          [activeOccupation.name]: true,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <div className="occupation-image-fallback">
+                      <p>{activeOccupation.name}</p>
+                      <p className="small">Agrega un archivo en /public/ocupaciones para ver su retrato.</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="occupation-dots" aria-label="Navegacion de ocupaciones">
