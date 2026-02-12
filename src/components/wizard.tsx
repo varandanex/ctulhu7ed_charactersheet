@@ -122,6 +122,7 @@ export function Wizard({ step }: { step: number }) {
   const [helpSkillOpen, setHelpSkillOpen] = useState<string | null>(null);
   const [occupationSlideIndex, setOccupationSlideIndex] = useState(0);
   const [occupationImageErrors, setOccupationImageErrors] = useState<Record<string, boolean>>({});
+  const [occupationImageOrientation, setOccupationImageOrientation] = useState<Record<string, "portrait" | "landscape">>({});
   const occupationTouchStartX = useRef<number | null>(null);
   const occupationTouchStartY = useRef<number | null>(null);
   const occupationTouchCurrentX = useRef<number | null>(null);
@@ -161,6 +162,7 @@ export function Wizard({ step }: { step: number }) {
   const activeOccupationHelp = activeOccupation ? getOccupationHelp(activeOccupation.name) : null;
   const activeOccupationImage = activeOccupation ? getOccupationImagePath(activeOccupation.name) : null;
   const activeOccupationImageUnavailable = activeOccupation ? occupationImageErrors[activeOccupation.name] : false;
+  const activeOccupationImageOrientation = activeOccupation ? occupationImageOrientation[activeOccupation.name] : undefined;
   const occupationSkills = useMemo(
     () => (draft.occupation ? collectAllowedOccupationSkills(draft.occupation) : []),
     [draft.occupation],
@@ -401,14 +403,6 @@ export function Wizard({ step }: { step: number }) {
     if (occupationSlideIndex < allOccupations.length) return;
     setOccupationSlideIndex(0);
   }, [allOccupations.length, occupationSlideIndex]);
-
-  useEffect(() => {
-    if (step !== 2 || allOccupations.length <= 1) return;
-    const intervalId = window.setInterval(() => {
-      setOccupationSlideIndex((current) => (current + 1) % allOccupations.length);
-    }, 5500);
-    return () => window.clearInterval(intervalId);
-  }, [allOccupations.length, step]);
 
   function applyOccupationBySlide(index: number) {
     const selected = allOccupations[index];
@@ -677,130 +671,133 @@ export function Wizard({ step }: { step: number }) {
                   </button>
                 </div>
 
-                <div className="occupation-visual">
-                  {!activeOccupationImageUnavailable && activeOccupationImage ? (
-                    <img
-                      key={activeOccupation.name}
-                      src={activeOccupationImage}
-                      alt={`Retrato de ${activeOccupation.name}`}
-                      className="occupation-image"
-                      loading="lazy"
-                      onError={() =>
-                        setOccupationImageErrors((current) => ({
-                          ...current,
-                          [activeOccupation.name]: true,
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="occupation-image-fallback">
-                      <p>{activeOccupation.name}</p>
-                      <p className="small">Agrega un archivo en /public/ocupaciones para ver su retrato.</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="occupation-dots" aria-label="Navegacion de ocupaciones">
-                  {allOccupations.map((item, index) => {
-                    const isActive = index === occupationSlideIndex;
-                    return (
-                      <button
-                        key={item.name}
-                        type="button"
-                        className={`occupation-dot ${isActive ? "active" : ""}`}
-                        onClick={() => setOccupationSlideIndex(index)}
-                        aria-label={`Ir a ${item.name}`}
-                        aria-current={isActive ? "true" : undefined}
-                      />
-                    );
-                  })}
-                </div>
-
-                <p>{activeOccupationHelp.overview}</p>
-                <p className="small">{activeOccupationHelp.style}</p>
-                <p className="small">{activeOccupationHelp.recommendedFor}</p>
-                <p className="small">Fuente: {professionCatalog.source}</p>
-
-                <div className="occupation-meta-grid">
-                  <div className="card">
-                    <p className="kpi">Credito recomendado</p>
-                    <p>{activeOccupation.credit_range}</p>
-                  </div>
-                  <div className="card">
-                    <p className="kpi">Formula de puntos</p>
-                    <p>{activeOccupation.occupation_points_formula}</p>
-                  </div>
-                  <div className="card">
-                    <p className="kpi">Etiqueta</p>
-                    <p>{activeOccupation.tags.length > 0 ? activeOccupation.tags.join(", ") : "General"}</p>
-                  </div>
-                </div>
-
-                <div className="occupation-columns">
-                  <div className="card">
-                    <p className="kpi">Habilidades basicas por defecto</p>
-                    <ul className="occupation-list">
-                      {activeOccupation.skills.map((skill) => (
-                        <li key={skill}>{skill}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="card">
-                    <p className="kpi">Opciones de ocupacion</p>
-                    {activeOccupation.choice_groups.length === 0 ? (
-                      <p className="small">No tiene grupos opcionales.</p>
-                    ) : (
-                      <ul className="occupation-list">
-                        {activeOccupation.choice_groups.map((group, index) => (
-                          <li key={`${group.label}-${index}`}>
-                            Elegir {group.count} de ({group.from.join(", ")}) [{group.label}]
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-
-                {draft.occupation?.name === activeOccupation.name && activeOccupation.choice_groups.length > 0 && (
-                  <div className="card">
-                    <p className="kpi">Seleccion de opciones de ocupacion</p>
-                    {activeOccupation.choice_groups.map((group, index) => {
-                      const key = getChoiceKey(index, group.label);
-                      const options = getChoiceGroupSkillOptions(index, activeOccupation.name);
-                      const selectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
-                      return (
-                        <div key={key} style={{ marginBottom: 12 }}>
-                          <label>
-                            {group.label} (elige {group.count})
-                          </label>
-                          <select
-                            multiple
-                            size={Math.min(8, Math.max(4, options.length))}
-                            value={selectedValues}
-                            onChange={(event) => {
-                              const values = Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
-                              setChoiceGroupSkills(index, group.label, values, group.count);
-                            }}
-                          >
-                            {options.map((option) => (
-                              <option key={option} value={option}>
-                                {option}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="small">
-                            Seleccionadas: {selectedValues.length} / {group.count}
-                          </p>
+                <div className="occupation-layout">
+                  <div className="occupation-media">
+                    <div className={`occupation-visual ${activeOccupationImageOrientation === "portrait" ? "portrait" : "landscape"}`}>
+                      {!activeOccupationImageUnavailable && activeOccupationImage ? (
+                        <img
+                          key={activeOccupation.name}
+                          src={activeOccupationImage}
+                          alt={`Retrato de ${activeOccupation.name}`}
+                          className="occupation-image"
+                          loading="lazy"
+                          onLoad={(event) => {
+                            const image = event.currentTarget;
+                            const orientation = image.naturalHeight > image.naturalWidth ? "portrait" : "landscape";
+                            setOccupationImageOrientation((current) => ({
+                              ...current,
+                              [activeOccupation.name]: orientation,
+                            }));
+                          }}
+                          onError={() =>
+                            setOccupationImageErrors((current) => ({
+                              ...current,
+                              [activeOccupation.name]: true,
+                            }))
+                          }
+                        />
+                      ) : (
+                        <div className="occupation-image-fallback">
+                          <div className="arcane-seal" aria-hidden="true">
+                            <div className="arcane-seal-core" />
+                          </div>
+                          <p className="occupation-fallback-title">Sello arcano</p>
+                          <p>{activeOccupation.name}</p>
+                          <p className="small">Retrato no disponible. Agrega un archivo en /public/ocupaciones.</p>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      )}
+                    </div>
 
-                <div className="occupation-carousel-actions">
-                  <button type="button" className="primary" onClick={() => applyOccupationBySlide(occupationSlideIndex)}>
-                    Elegir {activeOccupation.name}
-                  </button>
+                  </div>
+
+                  <div className="occupation-details">
+                    <p>{activeOccupationHelp.overview}</p>
+                    <p className="small">{activeOccupationHelp.style}</p>
+                    <p className="small">{activeOccupationHelp.recommendedFor}</p>
+                    <p className="small">Fuente: {professionCatalog.source}</p>
+
+                    <div className="occupation-meta-grid">
+                      <div className="card">
+                        <p className="kpi">Credito recomendado</p>
+                        <p>{activeOccupation.credit_range}</p>
+                      </div>
+                      <div className="card">
+                        <p className="kpi">Formula de puntos</p>
+                        <p>{activeOccupation.occupation_points_formula}</p>
+                      </div>
+                      <div className="card">
+                        <p className="kpi">Etiqueta</p>
+                        <p>{activeOccupation.tags.length > 0 ? activeOccupation.tags.join(", ") : "General"}</p>
+                      </div>
+                    </div>
+
+                    <div className="occupation-columns">
+                      <div className="card">
+                        <p className="kpi">Habilidades basicas por defecto</p>
+                        <ul className="occupation-list">
+                          {activeOccupation.skills.map((skill) => (
+                            <li key={skill}>{skill}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="card">
+                        <p className="kpi">Opciones de ocupacion</p>
+                        {activeOccupation.choice_groups.length === 0 ? (
+                          <p className="small">No tiene grupos opcionales.</p>
+                        ) : (
+                          <ul className="occupation-list">
+                            {activeOccupation.choice_groups.map((group, index) => (
+                              <li key={`${group.label}-${index}`}>
+                                Elegir {group.count} de ({group.from.join(", ")}) [{group.label}]
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+
+                    {draft.occupation?.name === activeOccupation.name && activeOccupation.choice_groups.length > 0 && (
+                      <div className="card">
+                        <p className="kpi">Seleccion de opciones de ocupacion</p>
+                        {activeOccupation.choice_groups.map((group, index) => {
+                          const key = getChoiceKey(index, group.label);
+                          const options = getChoiceGroupSkillOptions(index, activeOccupation.name);
+                          const selectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
+                          return (
+                            <div key={key} style={{ marginBottom: 12 }}>
+                              <label>
+                                {group.label} (elige {group.count})
+                              </label>
+                              <select
+                                multiple
+                                size={Math.min(8, Math.max(4, options.length))}
+                                value={selectedValues}
+                                onChange={(event) => {
+                                  const values = Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
+                                  setChoiceGroupSkills(index, group.label, values, group.count);
+                                }}
+                              >
+                                {options.map((option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                ))}
+                              </select>
+                              <p className="small">
+                                Seleccionadas: {selectedValues.length} / {group.count}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="occupation-carousel-actions">
+                      <button type="button" className="primary" onClick={() => applyOccupationBySlide(occupationSlideIndex)}>
+                        Elegir {activeOccupation.name}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

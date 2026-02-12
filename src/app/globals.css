@@ -229,16 +229,25 @@ button:disabled {
 
 .occupation-visual {
   position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   overflow: hidden;
   border-radius: 12px;
   border: 1px solid #3d4f51;
-  min-height: 240px;
+  aspect-ratio: 16 / 9;
   background: #101818;
+}
+
+.occupation-visual.portrait {
+  aspect-ratio: 9 / 16;
+  width: min(100%, 420px);
+  margin: 0 auto;
 }
 
 .occupation-image {
   width: 100%;
-  height: clamp(260px, 38vw, 420px);
+  height: 100%;
   object-fit: cover;
   object-position: center;
   display: block;
@@ -246,44 +255,80 @@ button:disabled {
 }
 
 .occupation-image-fallback {
+  position: relative;
+  width: 100%;
+  height: 100%;
   min-height: 240px;
-  height: clamp(260px, 38vw, 420px);
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 6px;
   text-align: center;
   padding: 20px;
+  isolation: isolate;
   background:
     radial-gradient(circle at 20% 20%, rgba(112, 143, 110, 0.22), transparent 45%),
     radial-gradient(circle at 80% 80%, rgba(221, 160, 87, 0.2), transparent 40%),
     linear-gradient(145deg, #172022, #11191b);
 }
 
+.arcane-seal {
+  width: clamp(92px, 18vw, 140px);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  margin-bottom: 10px;
+  border: 2px solid rgba(176, 211, 146, 0.62);
+  box-shadow:
+    0 0 0 8px rgba(92, 134, 112, 0.2),
+    0 0 32px rgba(199, 158, 94, 0.28),
+    inset 0 0 20px rgba(178, 199, 123, 0.16);
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle, rgba(198, 171, 95, 0.22), rgba(16, 24, 24, 0.08) 62%, transparent 63%),
+    repeating-conic-gradient(from 8deg, rgba(157, 203, 129, 0.2) 0deg 14deg, rgba(16, 24, 24, 0) 14deg 30deg);
+  animation: arcane-pulse 2.6s ease-in-out infinite;
+}
+
+.arcane-seal-core {
+  width: 42%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  border: 1px solid rgba(208, 217, 165, 0.65);
+  box-shadow:
+    inset 0 0 20px rgba(248, 197, 122, 0.22),
+    0 0 18px rgba(189, 219, 134, 0.3);
+}
+
+.occupation-fallback-title {
+  margin: 0;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: #d8e4b7;
+}
+
 .occupation-image-fallback p {
   margin: 0;
 }
 
-.occupation-dots {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
+.occupation-layout {
+  display: grid;
+  gap: 12px;
 }
 
-.occupation-dot {
-  width: 12px;
-  min-width: 12px;
-  height: 12px;
-  padding: 0;
-  border-radius: 999px;
-  border: 1px solid #4d5f61;
-  background: #182224;
+.occupation-media {
+  display: grid;
+  gap: 10px;
 }
 
-.occupation-dot.active {
-  border-color: #8fbe6c;
-  background: #8fbe6c;
+.occupation-details {
+  display: grid;
+  gap: 12px;
+}
+
+.occupation-details p {
+  margin: 0;
 }
 
 .occupation-meta-grid {
@@ -503,6 +548,18 @@ button:disabled {
   }
 }
 
+@keyframes arcane-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: saturate(0.95);
+  }
+  50% {
+    transform: scale(1.025);
+    filter: saturate(1.08);
+  }
+}
+
 pre.json {
   max-height: 300px;
   overflow: auto;
@@ -513,6 +570,12 @@ pre.json {
 }
 
 @media (min-width: 980px) {
+  .occupation-layout {
+    grid-template-columns: minmax(320px, 0.95fr) minmax(360px, 1.05fr);
+    align-items: start;
+    gap: 14px;
+  }
+
   .occupation-columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -532,5 +595,11 @@ pre.json {
   .mobile-points-bar,
   .mobile-points-modal {
     display: none;
+  }
+}
+
+@media (max-width: 880px) {
+  .occupation-visual.portrait {
+    width: min(100%, 340px);
   }
 }
