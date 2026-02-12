@@ -12,18 +12,20 @@ import type {
 } from "@/domain/types";
 import { applyAgeModifiers, rollCharacteristics } from "@/domain/rules";
 
+const defaultAgePenaltyAllocation: AgePenaltyAllocation = {
+  youthFuePenalty: 2,
+  youthTamPenalty: 3,
+  matureFuePenalty: 1,
+  matureConPenalty: 1,
+  matureDesPenalty: 3,
+};
+
 const emptyDraft: CharacterDraft = {
   mode: "random",
   age: 25,
   lastRolledAge: undefined,
   era: "clasica",
-  agePenaltyAllocation: {
-    youthFuePenalty: 2,
-    youthTamPenalty: 3,
-    matureFuePenalty: 1,
-    matureConPenalty: 1,
-    matureDesPenalty: 3,
-  },
+  agePenaltyAllocation: defaultAgePenaltyAllocation,
   characteristics: {},
   occupation: undefined,
   skills: {
@@ -87,6 +89,7 @@ export const useCharacterStore = create<CharacterStore>()(
           draft: {
             ...state.draft,
             agePenaltyAllocation: {
+              ...defaultAgePenaltyAllocation,
               ...state.draft.agePenaltyAllocation,
               ...allocation,
             },
@@ -155,6 +158,50 @@ export const useCharacterStore = create<CharacterStore>()(
       name: "coc7-character-draft",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ draft: state.draft }),
+      merge: (persistedState, currentState) => {
+        const state = (persistedState as Partial<CharacterStore> | undefined) ?? {};
+        const persistedDraft = state.draft;
+
+        return {
+          ...currentState,
+          ...state,
+          draft: {
+            ...emptyDraft,
+            ...persistedDraft,
+            agePenaltyAllocation: {
+              ...defaultAgePenaltyAllocation,
+              ...persistedDraft?.agePenaltyAllocation,
+            },
+            characteristics: {
+              ...emptyDraft.characteristics,
+              ...persistedDraft?.characteristics,
+            },
+            skills: {
+              occupation: {
+                ...emptyDraft.skills.occupation,
+                ...persistedDraft?.skills?.occupation,
+              },
+              personal: {
+                ...emptyDraft.skills.personal,
+                ...persistedDraft?.skills?.personal,
+              },
+            },
+            background: {
+              ...emptyDraft.background,
+              ...persistedDraft?.background,
+            },
+            identity: {
+              ...emptyDraft.identity,
+              ...persistedDraft?.identity,
+            },
+            companions: persistedDraft?.companions ?? emptyDraft.companions,
+            equipment: {
+              ...emptyDraft.equipment,
+              ...persistedDraft?.equipment,
+            },
+          },
+        };
+      },
     },
   ),
 );

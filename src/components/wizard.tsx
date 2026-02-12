@@ -30,6 +30,13 @@ const occupationImageOverrides: Record<string, string> = {
   "Agente de policia": "/ocupaciones/agente-policia.jpg",
   "Inspector de policia": "/ocupaciones/inspector-policia.jpg",
 };
+const defaultAgePenaltyAllocation = {
+  youthFuePenalty: 2,
+  youthTamPenalty: 3,
+  matureFuePenalty: 1,
+  matureConPenalty: 1,
+  matureDesPenalty: 3,
+};
 
 function parseCreditRange(range: string): { min: number; max: number } {
   const [min, max] = range.split("-").map((n) => Number(n.trim()));
@@ -208,13 +215,14 @@ export function Wizard({ step }: { step: number }) {
   const personalRemaining = personalPoints - personalAssigned;
   const occupationRemainingBudget = Math.max(occupationRemaining, 0);
   const personalRemainingBudget = Math.max(personalRemaining, 0);
+  const agePenaltyAllocation = draft.agePenaltyAllocation ?? defaultAgePenaltyAllocation;
   const youthTarget = draft.age >= 15 && draft.age <= 19 ? 5 : 0;
-  const youthCurrent = draft.agePenaltyAllocation.youthFuePenalty + draft.agePenaltyAllocation.youthTamPenalty;
+  const youthCurrent = agePenaltyAllocation.youthFuePenalty + agePenaltyAllocation.youthTamPenalty;
   const matureTarget = getMaturePenaltyTarget(draft.age);
   const matureCurrent =
-    draft.agePenaltyAllocation.matureFuePenalty +
-    draft.agePenaltyAllocation.matureConPenalty +
-    draft.agePenaltyAllocation.matureDesPenalty;
+    agePenaltyAllocation.matureFuePenalty +
+    agePenaltyAllocation.matureConPenalty +
+    agePenaltyAllocation.matureDesPenalty;
   const youthState = getTargetState(youthCurrent, youthTarget);
   const matureState = getTargetState(matureCurrent, matureTarget);
   const eduImprovementRolls = getEduImprovementRolls(draft.age);
@@ -556,7 +564,7 @@ export function Wizard({ step }: { step: number }) {
                       type="number"
                       min={0}
                       max={5}
-                      value={draft.agePenaltyAllocation.youthFuePenalty}
+                      value={agePenaltyAllocation.youthFuePenalty}
                       onChange={(e) => setAgePenaltyAllocation({ youthFuePenalty: Number(e.target.value) })}
                     />
                   </div>
@@ -566,13 +574,13 @@ export function Wizard({ step }: { step: number }) {
                       type="number"
                       min={0}
                       max={5}
-                      value={draft.agePenaltyAllocation.youthTamPenalty}
+                      value={agePenaltyAllocation.youthTamPenalty}
                       onChange={(e) => setAgePenaltyAllocation({ youthTamPenalty: Number(e.target.value) })}
                     />
                   </div>
                 </div>
                 <p className={`points-state ${youthState}`}>
-                  Total actual: {draft.agePenaltyAllocation.youthFuePenalty + draft.agePenaltyAllocation.youthTamPenalty} / 5
+                  Total actual: {agePenaltyAllocation.youthFuePenalty + agePenaltyAllocation.youthTamPenalty} / 5
                 </p>
               </div>
             )}
@@ -585,7 +593,7 @@ export function Wizard({ step }: { step: number }) {
                     <input
                       type="number"
                       min={0}
-                      value={draft.agePenaltyAllocation.matureFuePenalty}
+                      value={agePenaltyAllocation.matureFuePenalty}
                       onChange={(e) => setAgePenaltyAllocation({ matureFuePenalty: Number(e.target.value) })}
                     />
                   </div>
@@ -594,7 +602,7 @@ export function Wizard({ step }: { step: number }) {
                     <input
                       type="number"
                       min={0}
-                      value={draft.agePenaltyAllocation.matureConPenalty}
+                      value={agePenaltyAllocation.matureConPenalty}
                       onChange={(e) => setAgePenaltyAllocation({ matureConPenalty: Number(e.target.value) })}
                     />
                   </div>
@@ -603,16 +611,16 @@ export function Wizard({ step }: { step: number }) {
                     <input
                       type="number"
                       min={0}
-                      value={draft.agePenaltyAllocation.matureDesPenalty}
+                      value={agePenaltyAllocation.matureDesPenalty}
                       onChange={(e) => setAgePenaltyAllocation({ matureDesPenalty: Number(e.target.value) })}
                     />
                   </div>
                 </div>
                 <p className={`points-state ${matureState}`}>
                   Total actual:
-                  {draft.agePenaltyAllocation.matureFuePenalty +
-                    draft.agePenaltyAllocation.matureConPenalty +
-                    draft.agePenaltyAllocation.matureDesPenalty}
+                  {agePenaltyAllocation.matureFuePenalty +
+                    agePenaltyAllocation.matureConPenalty +
+                    agePenaltyAllocation.matureDesPenalty}
                   / {matureTarget}
                 </p>
               </div>
