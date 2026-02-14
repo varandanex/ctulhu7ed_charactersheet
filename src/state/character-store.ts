@@ -20,6 +20,10 @@ const defaultAgePenaltyAllocation: AgePenaltyAllocation = {
   matureDesPenalty: 3,
 };
 
+function normalizeEra(era: string | undefined): string {
+  return era === "actual" ? "clasica" : (era ?? "clasica");
+}
+
 const emptyDraft: CharacterDraft = {
   mode: "random",
   age: 25,
@@ -83,7 +87,7 @@ export const useCharacterStore = create<CharacterStore>()(
       draft: emptyDraft,
       setMode: (mode) => set((state) => ({ draft: { ...state.draft, mode } })),
       setAge: (age) => set((state) => ({ draft: { ...state.draft, age } })),
-      setEra: (era) => set((state) => ({ draft: { ...state.draft, era } })),
+      setEra: (era) => set((state) => ({ draft: { ...state.draft, era: normalizeEra(era) } })),
       setAgePenaltyAllocation: (allocation) =>
         set((state) => ({
           draft: {
@@ -168,6 +172,7 @@ export const useCharacterStore = create<CharacterStore>()(
           draft: {
             ...emptyDraft,
             ...persistedDraft,
+            era: normalizeEra(persistedDraft?.era),
             agePenaltyAllocation: {
               ...defaultAgePenaltyAllocation,
               ...persistedDraft?.agePenaltyAllocation,

@@ -151,12 +151,8 @@ export function Wizard({ step }: { step: number }) {
   const occupation = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
   const occupationCreditRange = occupation ? parseCreditRange(occupation.credit_range) : null;
   const allOccupations = useMemo(
-    () =>
-      professionCatalog.occupations.filter((item) => {
-        if (draft.era === "actual") return true;
-        return !item.tags.includes("actual");
-      }),
-    [draft.era],
+    () => professionCatalog.occupations.filter((item) => !item.tags.includes("actual")),
+    [],
   );
   const activeOccupation = allOccupations[occupationSlideIndex] ?? null;
   const activeOccupationHelp = activeOccupation ? getOccupationHelp(activeOccupation.name) : null;
@@ -521,9 +517,8 @@ export function Wizard({ step }: { step: number }) {
             </div>
             <div className="card">
               <label>Ambientacion</label>
-              <select value={draft.era ?? "clasica"} onChange={(e) => setEra(e.target.value)}>
-                <option value="clasica">Lovecraft clasica</option>
-                <option value="actual">Actual</option>
+              <select value="clasica" onChange={(e) => setEra(e.target.value)}>
+                <option value="clasica">Años 20 (Lovecraft clasica)</option>
               </select>
             </div>
             <div className="card">

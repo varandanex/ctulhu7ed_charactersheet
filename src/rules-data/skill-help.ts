@@ -142,7 +142,7 @@ const skillHelpCatalog: Record<string, Omit<SkillHelp, "skill">> = {
   historia: {
     base: "05%",
     summary: "Conocimiento de hechos, periodos, personajes y contexto historico.",
-    example: "Relacionar un culto actual con una sociedad secreta antigua.",
+    example: "Relacionar un culto reciente con una sociedad secreta antigua.",
     complement: "Muy util para interpretar pistas de epoca, genealogias y cronologias.",
   },
   intimidar: {
@@ -268,7 +268,7 @@ const skillHelpCatalog: Record<string, Omit<SkillHelp, "skill">> = {
   tasacion: {
     base: "05%",
     summary: "Valorar autenticidad, procedencia y precio de objetos.",
-    example: "Detectar que un manuscrito 'antiguo' es una falsificacion moderna.",
+    example: "Detectar que un manuscrito 'antiguo' es una falsificacion reciente.",
     complement: "Muy util para separar pista real de cebo en subastas, anticuarios y colecciones privadas.",
   },
   trepar: {
@@ -281,13 +281,13 @@ const skillHelpCatalog: Record<string, Omit<SkillHelp, "skill">> = {
     base: "01%",
     summary: "Manipulacion de equipos electronicos, circuitos modernos y dispositivos de comunicacion.",
     example: "Analizar un transmisor o arreglar un equipo dañado.",
-    complement: "Mas relevante en ambientacion actual; complementa Electricidad/Mecanica.",
+    complement: "Complementa Electricidad/Mecanica cuando aparece tecnologia especializada.",
   },
   informatica: {
     base: "05%",
     summary: "Busqueda y operacion de sistemas informaticos, redes y datos digitales.",
     example: "Recuperar archivos borrados o rastrear actividad en un terminal.",
-    complement: "En escenarios actuales, sustituye parte de la investigacion de archivo fisico.",
+    complement: "Sustituye parte de la investigacion de archivo fisico cuando hay soporte digital.",
   },
 };
 
@@ -333,4 +333,3 @@ export function getSkillHelp(skill: string): SkillHelp {
     complement: "Si aparece como opcion de ocupacion, suele ser una via legitima para resolver pistas.",
   };
 }
-

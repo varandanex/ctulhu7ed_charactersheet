@@ -126,9 +126,9 @@ const occupationHelpCatalog: Record<string, OccupationHelp> = {
     recommendedFor: "Aventuras con viajes largos, rescates y persecuciones.",
   },
   "pirata informatico": {
-    overview: "Perfil tecnico de era actual para sistemas y redes.",
+    overview: "Perfil tecnico especializado en sistemas y redes.",
     style: "Rompe barreras digitales y recupera datos criticos de forma no convencional.",
-    recommendedFor: "Campanas contemporaneas con infraestructura digital.",
+    recommendedFor: "Campanas con infraestructura digital.",
   },
   "profesor de universidad": {
     overview: "Academico con alto nivel de investigacion y especializacion.",
