@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { investigatorSkillsCatalog, professionCatalog, stepsCatalog } from "@/rules-data/catalog";
 import { getOccupationHelp } from "@/rules-data/occupation-help";
 import { getSkillHelp } from "@/rules-data/skill-help";
@@ -150,10 +151,11 @@ export function Wizard({ step }: { step: number }) {
 
   const occupation = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
   const occupationCreditRange = occupation ? parseCreditRange(occupation.credit_range) : null;
-  const allOccupations = useMemo(
-    () => professionCatalog.occupations.filter((item) => !item.tags.includes("actual")),
-    [],
-  );
+  const selectedEra = draft.era ?? "clasica";
+  const allOccupations = useMemo(() => {
+    if (selectedEra === "actual") return professionCatalog.occupations;
+    return professionCatalog.occupations.filter((item) => !item.tags.includes("actual"));
+  }, [selectedEra]);
   const activeOccupation = allOccupations[occupationSlideIndex] ?? null;
   const activeOccupationHelp = activeOccupation ? getOccupationHelp(activeOccupation.name) : null;
   const activeOccupationImage = activeOccupation ? getOccupationImagePath(activeOccupation.name) : null;
@@ -499,6 +501,7 @@ export function Wizard({ step }: { step: number }) {
             6. Resumen
           </button>
         </div>
+        <p className="small step-nav-hint">Desliza la barra de pasos para ver todos los pasos.</p>
 
         <Issues issues={issues} />
 
@@ -517,8 +520,9 @@ export function Wizard({ step }: { step: number }) {
             </div>
             <div className="card">
               <label>Ambientacion</label>
-              <select value="clasica" onChange={(e) => setEra(e.target.value)}>
+              <select value={selectedEra} onChange={(e) => setEra(e.target.value)}>
                 <option value="clasica">Años 20 (Lovecraft clasica)</option>
+                <option value="actual">Era actual</option>
               </select>
             </div>
             <div className="card">
@@ -670,14 +674,17 @@ export function Wizard({ step }: { step: number }) {
                   <div className="occupation-media">
                     <div className={`occupation-visual ${activeOccupationImageOrientation === "portrait" ? "portrait" : "landscape"}`}>
                       {!activeOccupationImageUnavailable && activeOccupationImage ? (
-                        <img
+                        <Image
                           key={activeOccupation.name}
                           src={activeOccupationImage}
                           alt={`Retrato de ${activeOccupation.name}`}
                           className="occupation-image"
+                          fill
+                          sizes="(max-width: 768px) 100vw, 50vw"
+                          quality={72}
                           loading="lazy"
                           onLoad={(event) => {
-                            const image = event.currentTarget;
+                            const image = event.currentTarget as HTMLImageElement;
                             const orientation = image.naturalHeight > image.naturalWidth ? "portrait" : "landscape";
                             setOccupationImageOrientation((current) => ({
                               ...current,
@@ -1076,7 +1083,7 @@ export function Wizard({ step }: { step: number }) {
               <textarea value={draft.background.rasgos ?? ""} onChange={(e) => setBackgroundField("rasgos", e.target.value)} />
             </div>
             <div className="card" style={{ gridColumn: "1 / -1" }}>
-              <label>Vinculo fundamental (opcional)</label>
+              <label>Vinculo fundamental (obligatorio)</label>
               <input
                 value={draft.background.vinculoPrincipal ?? ""}
                 onChange={(e) => setBackgroundField("vinculoPrincipal", e.target.value)}

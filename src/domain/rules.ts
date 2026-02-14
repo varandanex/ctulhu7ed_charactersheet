@@ -446,9 +446,11 @@ function getBaseSkillValue(skill: string, characteristics: Characteristics): num
   if (normalized === "trepar") return 20;
 
   if (normalized.startsWith("arte/artesania")) return 5;
+  if (normalized.startsWith("arte (")) return 5;
   if (normalized.startsWith("ciencia")) return 1;
   if (normalized.startsWith("armas de fuego")) return 0;
   if (normalized.startsWith("combatir")) return 0;
+  if (normalized.startsWith("conducir automovil")) return 20;
   if (normalized.startsWith("otras lenguas")) return 1;
   if (normalized.startsWith("pilotar")) return 1;
   if (normalized.startsWith("supervivencia")) return 10;

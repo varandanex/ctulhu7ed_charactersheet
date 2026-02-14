@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyAgeModifiers,
+  computeSkillBreakdown,
   computeDerivedStats,
   evaluateOccupationPointsFormula,
   validateStep,
@@ -82,6 +83,19 @@ describe("domain rules", () => {
   it("rejects forbidden skills for personal interest", () => {
     const issues = validateSkillAllocation(100, 100, { Psicologia: 10 }, { "Mitos de Cthulhu": 10 });
     expect(issues.some((issue) => issue.code === "FORBIDDEN_SKILL")).toBe(true);
+  });
+
+  it("computes non-zero base for variant skill names", () => {
+    const computed = computeSkillBreakdown(sampleCharacteristics, {
+      occupation: {
+        "Conducir automovil (o camioneta)": 10,
+        "Arte (Literatura)": 10,
+      },
+      personal: {},
+    });
+
+    expect(computed["Conducir automovil (o camioneta)"]?.base).toBe(20);
+    expect(computed["Arte (Literatura)"]?.base).toBe(5);
   });
 
   it("counts credit as occupation points", () => {

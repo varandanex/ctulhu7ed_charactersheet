@@ -95,6 +95,12 @@ button {
   font-size: 0.95rem;
 }
 
+input,
+select,
+button {
+  min-height: 44px;
+}
+
 textarea {
   min-height: 84px;
   resize: vertical;
@@ -132,6 +138,9 @@ button:disabled {
   gap: 8px;
   overflow-x: auto;
   margin: 16px 0 20px;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
 }
 
 .step-pill {
@@ -140,13 +149,24 @@ button:disabled {
   border: 1px solid var(--border);
   background: #111718;
   color: var(--text-muted);
-  padding: 8px 14px;
+  padding: 10px 14px;
+  scroll-snap-align: start;
 }
 
 .step-pill.active {
   border-color: #577f6f;
   color: var(--text);
   box-shadow: inset 0 0 0 1px rgba(143, 190, 108, 0.35);
+}
+
+.step-nav-hint {
+  margin: -10px 0 14px;
+}
+
+@media (min-width: 720px) {
+  .step-nav-hint {
+    display: none;
+  }
 }
 
 .alert {

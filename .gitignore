@@ -13,6 +13,7 @@ next-env.d.ts
 coverage/
 playwright-report/
 test-results/
+output/
 
 # Environment
 .env*
@@ -20,6 +21,7 @@ test-results/
 
 # Tooling and local artifacts
 .codex/
+.venv/
 tmp/
 .DS_Store
 .vercel/

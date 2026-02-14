@@ -21,7 +21,8 @@ const defaultAgePenaltyAllocation: AgePenaltyAllocation = {
 };
 
 function normalizeEra(era: string | undefined): string {
-  return era === "actual" ? "clasica" : (era ?? "clasica");
+  if (era === "clasica" || era === "actual") return era;
+  return "clasica";
 }
 
 const emptyDraft: CharacterDraft = {
