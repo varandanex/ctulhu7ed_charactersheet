@@ -122,6 +122,7 @@ export function Wizard({ step }: { step: number }) {
   const [helpSkillOpen, setHelpSkillOpen] = useState<string | null>(null);
   const [occupationSlideIndex, setOccupationSlideIndex] = useState(0);
   const [occupationImageErrors, setOccupationImageErrors] = useState<Record<string, boolean>>({});
+  const [occupationImageLoaded, setOccupationImageLoaded] = useState<Record<string, boolean>>({});
   const [occupationImageOrientation, setOccupationImageOrientation] = useState<Record<string, "portrait" | "landscape">>({});
   const occupationTouchStartX = useRef<number | null>(null);
   const occupationTouchStartY = useRef<number | null>(null);
@@ -158,6 +159,8 @@ export function Wizard({ step }: { step: number }) {
   const activeOccupation = allOccupations[occupationSlideIndex] ?? null;
   const activeOccupationImage = activeOccupation ? getOccupationImagePath(activeOccupation.name) : null;
   const activeOccupationImageUnavailable = activeOccupation ? occupationImageErrors[activeOccupation.name] : false;
+  const activeOccupationImageLoading =
+    activeOccupation && activeOccupationImage ? !occupationImageLoaded[activeOccupation.name] && !activeOccupationImageUnavailable : false;
   const activeOccupationImageOrientation = activeOccupation ? occupationImageOrientation[activeOccupation.name] : undefined;
   const occupationSkills = useMemo(
     () => (draft.occupation ? collectAllowedOccupationSkills(draft.occupation) : []),
@@ -672,30 +675,41 @@ export function Wizard({ step }: { step: number }) {
                   <div className="occupation-media">
                     <div className={`occupation-visual ${activeOccupationImageOrientation === "portrait" ? "portrait" : "landscape"}`}>
                       {!activeOccupationImageUnavailable && activeOccupationImage ? (
-                        <Image
-                          key={activeOccupation.name}
-                          src={activeOccupationImage}
-                          alt={`Retrato de ${activeOccupation.name}`}
-                          className="occupation-image"
-                          fill
-                          sizes="(max-width: 768px) 100vw, 50vw"
-                          quality={72}
-                          loading="lazy"
-                          onLoad={(event) => {
-                            const image = event.currentTarget as HTMLImageElement;
-                            const orientation = image.naturalHeight > image.naturalWidth ? "portrait" : "landscape";
-                            setOccupationImageOrientation((current) => ({
-                              ...current,
-                              [activeOccupation.name]: orientation,
-                            }));
-                          }}
-                          onError={() =>
-                            setOccupationImageErrors((current) => ({
-                              ...current,
-                              [activeOccupation.name]: true,
-                            }))
-                          }
-                        />
+                        <>
+                          <Image
+                            key={activeOccupation.name}
+                            src={activeOccupationImage}
+                            alt={`Retrato de ${activeOccupation.name}`}
+                            className="occupation-image"
+                            fill
+                            sizes="(max-width: 768px) 100vw, 50vw"
+                            quality={72}
+                            loading="lazy"
+                            onLoad={(event) => {
+                              const image = event.currentTarget as HTMLImageElement;
+                              const orientation = image.naturalHeight > image.naturalWidth ? "portrait" : "landscape";
+                              setOccupationImageOrientation((current) => ({
+                                ...current,
+                                [activeOccupation.name]: orientation,
+                              }));
+                              setOccupationImageLoaded((current) => ({
+                                ...current,
+                                [activeOccupation.name]: true,
+                              }));
+                            }}
+                            onError={() =>
+                              setOccupationImageErrors((current) => ({
+                                ...current,
+                                [activeOccupation.name]: true,
+                              }))
+                            }
+                          />
+                          {activeOccupationImageLoading && (
+                            <div className="occupation-image-loader" role="status" aria-label="Cargando retrato">
+                              <span className="occupation-image-spinner" aria-hidden="true" />
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <div className="occupation-image-fallback">
                           <div className="arcane-seal" aria-hidden="true">
