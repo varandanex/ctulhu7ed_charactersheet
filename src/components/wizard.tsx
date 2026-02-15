@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { investigatorSkillsCatalog, professionCatalog, stepsCatalog } from "@/rules-data/catalog";
-import { getOccupationHelp } from "@/rules-data/occupation-help";
 import { getSkillHelp } from "@/rules-data/skill-help";
 import {
   buildDefaultChoiceSelections,
@@ -28,7 +27,7 @@ const characteristicKeys: CharacteristicKey[] = ["FUE", "CON", "TAM", "DES", "AP
 const occupationImageOverrides: Record<string, string> = {
   "Investigador privado": "/ocupaciones/investigador-privado.jpg",
   Anticuario: "/ocupaciones/anticuario.jpg",
-  "Agente de policia": "/ocupaciones/agente-policia.jpg",
+  "Agente de policia": "/ocupaciones/policia.jpg",
   "Inspector de policia": "/ocupaciones/inspector-policia.jpg",
 };
 const defaultAgePenaltyAllocation = {
@@ -157,7 +156,6 @@ export function Wizard({ step }: { step: number }) {
     return professionCatalog.occupations.filter((item) => !item.tags.includes("actual"));
   }, [selectedEra]);
   const activeOccupation = allOccupations[occupationSlideIndex] ?? null;
-  const activeOccupationHelp = activeOccupation ? getOccupationHelp(activeOccupation.name) : null;
   const activeOccupationImage = activeOccupation ? getOccupationImagePath(activeOccupation.name) : null;
   const activeOccupationImageUnavailable = activeOccupation ? occupationImageErrors[activeOccupation.name] : false;
   const activeOccupationImageOrientation = activeOccupation ? occupationImageOrientation[activeOccupation.name] : undefined;
@@ -648,7 +646,7 @@ export function Wizard({ step }: { step: number }) {
 
         {step === 2 && (
           <div className="grid">
-            {activeOccupation && activeOccupationHelp && (
+            {activeOccupation && (
               <div
                 className="card occupation-carousel"
                 onTouchStart={handleOccupationTouchStart}
@@ -713,11 +711,6 @@ export function Wizard({ step }: { step: number }) {
                   </div>
 
                   <div className="occupation-details">
-                    <p>{activeOccupationHelp.overview}</p>
-                    <p className="small">{activeOccupationHelp.style}</p>
-                    <p className="small">{activeOccupationHelp.recommendedFor}</p>
-                    <p className="small">Fuente: {professionCatalog.source}</p>
-
                     <div className="occupation-meta-grid">
                       <div className="card">
                         <p className="kpi">Credito recomendado</p>
