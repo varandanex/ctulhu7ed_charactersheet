@@ -181,6 +181,13 @@ function isCustomSkillBase(skill: string): boolean {
   return customSkillBaseOptions.some((option) => normalizeSkillName(option) === normalized);
 }
 
+function getCustomSkillSpecializationBase(skill: string): string | null {
+  const match = skill.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  if (!match) return null;
+  const base = match[1].trim();
+  return isCustomSkillBase(base) ? base : null;
+}
+
 function buildSkillOrderIndexMap(skills: string[]): Map<string, number> {
   const order = new Map<string, number>();
   skills.forEach((skill, index) => {
@@ -411,10 +418,6 @@ export function Wizard({ step }: { step: number }) {
   const [summaryHighlightCharacteristics, setSummaryHighlightCharacteristics] = useState<CharacteristicKey[]>([]);
   const [mobilePointsOpen, setMobilePointsOpen] = useState(false);
   const [helpSkillOpen, setHelpSkillOpen] = useState<string | null>(null);
-  const [customSkillBase, setCustomSkillBase] = useState<string>("Armas de fuego");
-  const [customSkillDetail, setCustomSkillDetail] = useState<string>("");
-  const [customSkillBucket, setCustomSkillBucket] = useState<"occupation" | "personal">("personal");
-  const [customSkillMessage, setCustomSkillMessage] = useState<string>("");
   const [customInlineDetails, setCustomInlineDetails] = useState<Record<string, string>>({});
   const [rollingCharacteristic, setRollingCharacteristic] = useState<CharacteristicKey | null>(null);
   const [recentlyRolledCharacteristic, setRecentlyRolledCharacteristic] = useState<CharacteristicKey | null>(null);
@@ -425,6 +428,7 @@ export function Wizard({ step }: { step: number }) {
   const [occupationImageErrors, setOccupationImageErrors] = useState<Record<string, boolean>>({});
   const [occupationImageLoaded, setOccupationImageLoaded] = useState<Record<string, boolean>>({});
   const [occupationImageOrientation, setOccupationImageOrientation] = useState<Record<string, "portrait" | "landscape">>({});
+  const [occupationImageInView, setOccupationImageInView] = useState(false);
   const launchTimeoutRef = useRef<number | null>(null);
   const rollPreviewIntervalRef = useRef<number | null>(null);
   const summaryHighlightTimeoutsRef = useRef<Partial<Record<CharacteristicKey, number>>>({});
@@ -432,6 +436,7 @@ export function Wizard({ step }: { step: number }) {
   const occupationTouchStartY = useRef<number | null>(null);
   const occupationTouchCurrentX = useRef<number | null>(null);
   const occupationTouchCurrentY = useRef<number | null>(null);
+  const occupationImageViewportRef = useRef<HTMLDivElement | null>(null);
   const {
     draft,
     setAge,
@@ -467,6 +472,7 @@ export function Wizard({ step }: { step: number }) {
   const activeOccupationImageLoading =
     activeOccupation && activeOccupationImage ? !occupationImageLoaded[activeOccupation.name] && !activeOccupationImageUnavailable : false;
   const activeOccupationImageOrientation = activeOccupation ? occupationImageOrientation[activeOccupation.name] : undefined;
+  const shouldRenderActiveOccupationImage = Boolean(activeOccupationImage && occupationImageInView);
   const occupationSkills = useMemo(
     () => (draft.occupation ? collectAllowedOccupationSkills(draft.occupation) : []),
     [draft.occupation],
@@ -477,9 +483,22 @@ export function Wizard({ step }: { step: number }) {
   );
   const personalSkills = useMemo(() => {
     const assignedSkills = [...Object.keys(draft.skills.occupation), ...Object.keys(draft.skills.personal)];
-    const unique = new Set([...investigatorSkillsCatalog.skills, ...occupationSkills, ...assignedSkills]);
+    const assignedSet = new Set(assignedSkills.map((skill) => normalizeSkillName(skill)));
+    const explicitOccupationSkills = new Set<string>([
+      ...(occupation?.skills ?? []).map((skill) => normalizeSkillName(skill)),
+      ...Object.values(draft.occupation?.selectedChoices ?? {}).flat().map((skill) => normalizeSkillName(skill)),
+    ]);
+    const shouldKeepSkill = (skill: string) => {
+      const customFamily = getCustomSkillSpecializationBase(skill);
+      if (!customFamily) return true;
+      const normalized = normalizeSkillName(skill);
+      return assignedSet.has(normalized) || explicitOccupationSkills.has(normalized);
+    };
+    const visibleCatalogSkills = investigatorSkillsCatalog.skills.filter(shouldKeepSkill);
+    const visibleOccupationSkills = occupationSkills.filter(shouldKeepSkill);
+    const unique = new Set([...visibleCatalogSkills, ...visibleOccupationSkills, ...assignedSkills, ...customSkillBaseOptions]);
     return [...unique];
-  }, [draft.skills.occupation, draft.skills.personal, occupationSkills]);
+  }, [draft.occupation?.selectedChoices, draft.skills.occupation, draft.skills.personal, occupation?.skills, occupationSkills]);
   const normalizedPersonalSkills = useMemo(() => new Set(personalSkills.map((skill) => normalizeSkillName(skill))), [personalSkills]);
   const groupedSkills = useMemo(() => {
     const fallback = ["Mitos de Cthulhu", "Psicologia", "Descubrir", "Buscar libros"];
@@ -830,42 +849,28 @@ export function Wizard({ step }: { step: number }) {
     const candidate = buildCustomSkillName(base, detail);
     const normalizedCandidate = normalizeSkillName(candidate);
     if (!normalizedCandidate) {
-      setCustomSkillMessage("Escribe una especialidad valida.");
       return { ok: false, candidate };
     }
 
     const exists = normalizedPersonalSkills.has(normalizedCandidate);
     if (exists) {
-      setCustomSkillMessage(`${candidate} ya existe en la lista.`);
       return { ok: false, candidate };
     }
 
     if (!normalizedCatalogSkills.has(normalizedCandidate)) {
-      setCustomSkillMessage(`${candidate} no aparece en el libro basico cargado.`);
       return { ok: false, candidate };
     }
 
     if (bucket === "occupation" && !isAllowedOccupationSkill(draft.occupation, candidate)) {
-      setCustomSkillMessage(`${candidate} no esta habilitada para tu ocupacion actual.`);
       return { ok: false, candidate };
     }
 
     if (isForbiddenInitialCreationSkill(candidate)) {
-      const bucketLabel = bucket === "occupation" ? "ocupacion" : "interes";
-      setCustomSkillMessage(`${candidate} no puede recibir puntos de ${bucketLabel} al crear personaje.`);
       return { ok: false, candidate };
     }
 
     setSkill(bucket, candidate, 0);
-    setCustomSkillMessage(`Habilidad agregada: ${candidate}`);
     return { ok: true, candidate };
-  }
-
-  function handleAddCustomSkill() {
-    const result = addCustomSkill(customSkillBase, customSkillDetail, customSkillBucket);
-    if (result.ok) {
-      setCustomSkillDetail("");
-    }
   }
 
   function handleInlineCustomSkillChange(base: string, value: string) {
@@ -1074,6 +1079,33 @@ export function Wizard({ step }: { step: number }) {
       setOccupationSlideIndex(selectedIndex);
     }
   }, [allOccupations, draft.occupation?.name, step]);
+
+  useEffect(() => {
+    if (step !== 4) {
+      setOccupationImageInView(false);
+      return;
+    }
+
+    const node = occupationImageViewportRef.current;
+    if (!node) return;
+
+    if (typeof IntersectionObserver === "undefined") {
+      setOccupationImageInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setOccupationImageInView(true);
+        observer.disconnect();
+      },
+      { rootMargin: "200px 0px", threshold: 0.01 },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [step]);
 
   useEffect(() => {
     if (step !== 4 || !draft.occupation) return;
@@ -1739,12 +1771,7 @@ export function Wizard({ step }: { step: number }) {
           <div className="grid">
             <div className="card">
               <p className="kpi">Ambientacion</p>
-              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                <span className="primary" style={{ display: "inline-flex", alignItems: "center", padding: "0.65rem 1rem" }}>
-                  Era fija: actual
-                </span>
-              </div>
-              <p className="small">Se usa siempre la ambientacion actual para habilitar todas las ocupaciones disponibles.</p>
+              <p className="small">Se muestran todas las ocupaciones disponibles.</p>
             </div>
             {activeOccupation && (
               <div
@@ -1769,39 +1796,41 @@ export function Wizard({ step }: { step: number }) {
                 </div>
 
                 <div className="occupation-layout">
-                  <div className="occupation-media">
+                  <div className="occupation-media" ref={occupationImageViewportRef}>
                     <div className={`occupation-visual ${activeOccupationImageOrientation === "portrait" ? "portrait" : "landscape"}`}>
                       {!activeOccupationImageUnavailable && activeOccupationImage ? (
                         <>
-                          <Image
-                            key={activeOccupation.name}
-                            src={activeOccupationImage}
-                            alt={`Retrato de ${activeOccupation.name}`}
-                            className="occupation-image"
-                            fill
-                            sizes="(max-width: 768px) 100vw, 50vw"
-                            quality={72}
-                            loading="lazy"
-                            onLoad={(event) => {
-                              const image = event.currentTarget as HTMLImageElement;
-                              const orientation = image.naturalHeight > image.naturalWidth ? "portrait" : "landscape";
-                              setOccupationImageOrientation((current) => ({
-                                ...current,
-                                [activeOccupation.name]: orientation,
-                              }));
-                              setOccupationImageLoaded((current) => ({
-                                ...current,
-                                [activeOccupation.name]: true,
-                              }));
-                            }}
-                            onError={() =>
-                              setOccupationImageErrors((current) => ({
-                                ...current,
-                                [activeOccupation.name]: true,
-                              }))
-                            }
-                          />
-                          {activeOccupationImageLoading && (
+                          {shouldRenderActiveOccupationImage ? (
+                            <Image
+                              key={activeOccupation.name}
+                              src={activeOccupationImage}
+                              alt={`Retrato de ${activeOccupation.name}`}
+                              className="occupation-image"
+                              fill
+                              sizes="(max-width: 768px) 100vw, 50vw"
+                              quality={72}
+                              loading="lazy"
+                              onLoad={(event) => {
+                                const image = event.currentTarget as HTMLImageElement;
+                                const orientation = image.naturalHeight > image.naturalWidth ? "portrait" : "landscape";
+                                setOccupationImageOrientation((current) => ({
+                                  ...current,
+                                  [activeOccupation.name]: orientation,
+                                }));
+                                setOccupationImageLoaded((current) => ({
+                                  ...current,
+                                  [activeOccupation.name]: true,
+                                }));
+                              }}
+                              onError={() =>
+                                setOccupationImageErrors((current) => ({
+                                  ...current,
+                                  [activeOccupation.name]: true,
+                                }))
+                              }
+                            />
+                          ) : null}
+                          {(activeOccupationImageLoading || !shouldRenderActiveOccupationImage) && (
                             <div className="occupation-image-loader" role="status" aria-label="Cargando retrato">
                               <span className="occupation-image-spinner" aria-hidden="true" />
                             </div>
@@ -2088,52 +2117,6 @@ export function Wizard({ step }: { step: number }) {
             </aside>
 
             <div className="grid">
-              <div className="card" style={{ gridColumn: "1 / -1" }}>
-                <p className="kpi">Agregar habilidad o especialidad</p>
-                <div className="grid two">
-                  <div>
-                    <label>Familia base</label>
-                    <select value={customSkillBase} onChange={(event) => setCustomSkillBase(event.target.value)}>
-                      {customSkillBaseOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label>Bolsa inicial</label>
-                    <select
-                      value={customSkillBucket}
-                      onChange={(event) => setCustomSkillBucket(event.target.value as "occupation" | "personal")}
-                    >
-                      <option value="personal">Interes</option>
-                      <option value="occupation">Ocupacion</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="grid two">
-                  <div>
-                    <label>Especialidad (opcional)</label>
-                    <input
-                      type="text"
-                      value={customSkillDetail}
-                      placeholder={customSkillInlineHints[customSkillBase] ?? "Ej: Subfusil, Quimica, Espanol, Helicoptero..."}
-                      onChange={(event) => setCustomSkillDetail(event.target.value)}
-                    />
-                  </div>
-                  <div style={{ alignSelf: "end" }}>
-                    <button type="button" className="primary" onClick={handleAddCustomSkill}>
-                      Agregar
-                    </button>
-                  </div>
-                </div>
-                <p className="small">
-                  Resultado: <strong>{buildCustomSkillName(customSkillBase, customSkillDetail)}</strong>
-                </p>
-                {customSkillMessage && <p className="small">{customSkillMessage}</p>}
-              </div>
-
               {groupedSkills.occupationFirst.length > 0 && (
                 <div className="card" style={{ gridColumn: "1 / -1" }}>
                   <p className="kpi">Habilidades de ocupacion</p>
@@ -2240,7 +2223,7 @@ export function Wizard({ step }: { step: number }) {
                           )}
                         </div>
                       )}
-                      <div className="grid three">
+                      <div className="grid three skill-points-fields-grid">
                         <div>
                           <label>Base</label>
                           <input type="number" value={skillBase} readOnly disabled />
@@ -2416,7 +2399,7 @@ export function Wizard({ step }: { step: number }) {
                           )}
                         </div>
                       )}
-                      <div className="grid three">
+                      <div className="grid three skill-points-fields-grid">
                         <div>
                           <label>Base</label>
                           <input type="number" value={skillBase} readOnly disabled />

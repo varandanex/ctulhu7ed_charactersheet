@@ -1779,6 +1779,12 @@ input[type="range"]#age-slider::-moz-range-thumb {
   text-align: center;
 }
 
+@media (max-width: 760px) {
+  .skill-points-fields-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .stepper-btn {
   width: 44px;
   min-width: 44px;
