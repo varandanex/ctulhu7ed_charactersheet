@@ -113,7 +113,7 @@ describe("domain rules", () => {
 
   it("validates occupation budget including credit rating", () => {
     const draft: CharacterDraft = {
-      mode: "manual",
+      mode: "random",
       age: 25,
       era: "clasica",
       agePenaltyAllocation: defaultAllocation,
@@ -151,7 +151,7 @@ describe("domain rules", () => {
 
   it("rejects occupation points assigned to non-occupation skills", () => {
     const draft: CharacterDraft = {
-      mode: "manual",
+      mode: "random",
       age: 25,
       era: "clasica",
       agePenaltyAllocation: defaultAllocation,
@@ -189,7 +189,7 @@ describe("domain rules", () => {
 
   it("requires minimum background and core connection in step 5", () => {
     const draft: CharacterDraft = {
-      mode: "manual",
+      mode: "random",
       age: 25,
       era: "clasica",
       agePenaltyAllocation: defaultAllocation,

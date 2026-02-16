@@ -85,7 +85,7 @@ export interface CharacterCompanion {
 }
 
 export interface CharacterDraft {
-  mode: "random" | "manual";
+  mode: "random";
   age: number;
   lastRolledAge?: number;
   era?: string;
@@ -100,7 +100,7 @@ export interface CharacterDraft {
 }
 
 export interface CharacterSheet {
-  mode: "random" | "manual";
+  mode: "random";
   age: number;
   era?: string;
   characteristics: Characteristics;

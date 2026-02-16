@@ -76,7 +76,6 @@ const emptyDraft: CharacterDraft = {
 
 interface CharacterStore {
   draft: CharacterDraft;
-  setMode: (mode: CharacterDraft["mode"]) => void;
   setAge: (age: number) => void;
   setEra: (era: string) => void;
   setAgePenaltyAllocation: (allocation: Partial<AgePenaltyAllocation>) => void;
@@ -100,7 +99,6 @@ export const useCharacterStore = create<CharacterStore>()(
   persist(
     (set) => ({
       draft: emptyDraft,
-      setMode: (mode) => set((state) => ({ draft: { ...state.draft, mode } })),
       setAge: (age) => set((state) => ({ draft: { ...state.draft, age } })),
       setEra: (era) => set((state) => ({ draft: { ...state.draft, era: normalizeEra(era) } })),
       setAgePenaltyAllocation: (allocation) =>
@@ -212,6 +210,7 @@ export const useCharacterStore = create<CharacterStore>()(
           draft: {
             ...emptyDraft,
             ...persistedDraft,
+            mode: "random",
             era: normalizeEra(persistedDraft?.era),
             agePenaltyAllocation: {
               ...defaultAgePenaltyAllocation,

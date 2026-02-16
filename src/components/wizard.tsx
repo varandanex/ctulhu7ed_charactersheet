@@ -165,7 +165,6 @@ export function Wizard({ step }: { step: number }) {
   const occupationTouchCurrentY = useRef<number | null>(null);
   const {
     draft,
-    setMode,
     setAge,
     setAgePenaltyAllocation,
     setLastRolledAge,
@@ -255,13 +254,12 @@ export function Wizard({ step }: { step: number }) {
   const completedCharacteristicCount = characteristicKeys.filter((key) => typeof draft.characteristics[key] === "number").length;
   const nextCharacteristicToRoll = characteristicKeys.find((key) => typeof draft.characteristics[key] !== "number");
   const allCharacteristicsRolled = completedCharacteristicCount === characteristicKeys.length;
-  const randomModeVisibleCharacteristicKeys = useMemo(() => {
-    if (draft.mode !== "random") return characteristicKeys;
+  const visibleCharacteristicKeys = useMemo(() => {
     if (rollingCharacteristic) return [rollingCharacteristic];
     if (nextCharacteristicToRoll) return [nextCharacteristicToRoll];
     const lastRolled = [...characteristicKeys].reverse().find((key) => typeof draft.characteristics[key] === "number");
     return lastRolled ? [lastRolled] : [characteristicKeys[0]];
-  }, [draft.mode, draft.characteristics, rollingCharacteristic, nextCharacteristicToRoll]);
+  }, [draft.characteristics, rollingCharacteristic, nextCharacteristicToRoll]);
   const youthTarget = draft.age >= 15 && draft.age <= 19 ? 5 : 0;
   const ageGuidance = useMemo(() => getAgeGuidance(draft.age), [draft.age]);
   const youthCurrent = agePenaltyAllocation.youthFuePenalty + agePenaltyAllocation.youthTamPenalty;
@@ -725,61 +723,47 @@ export function Wizard({ step }: { step: number }) {
 
         {step === 2 && (
           <div className="grid two">
-            <div className="card">
-              <label>Modo</label>
-              <select value={draft.mode} onChange={(e) => setMode(e.target.value as "random" | "manual")}>
-                <option value="random">Tirada aleatoria</option>
-                <option value="manual">Entrada manual</option>
-              </select>
+            <div className="card roll-substeps-card" style={{ gridColumn: "1 / -1" }}>
+              <p className="kpi">Subpaso 2.1: Tiradas de caracteristicas</p>
+              <p className="roll-progress">
+                {completedCharacteristicCount} / {characteristicKeys.length} completadas
+              </p>
+              <p className="roll-next-step">
+                {rollingCharacteristic
+                  ? `Lanzando ${rollingCharacteristic}...`
+                  : nextCharacteristicToRoll
+                    ? `Siguiente tirada: ${nextCharacteristicToRoll}`
+                    : "Tiradas completadas"}
+              </p>
+              {(rollingCharacteristic || nextCharacteristicToRoll) && (
+                <p className="roll-source">
+                  Tirada:{` `}
+                  {getCharacteristicRollSource((rollingCharacteristic ?? nextCharacteristicToRoll) as CharacteristicKey)}
+                </p>
+              )}
+              {rollingCharacteristic && (
+                <p className="roll-breakdown">Preparando detalle de la tirada...</p>
+              )}
+              <div className={`dice-roll-indicator ${rollingCharacteristic ? "active" : ""}`} aria-live="polite">
+                <span className="dice-icon" aria-hidden="true" />
+                <span>{rollingCharacteristic ? "Tirada en curso" : "Listo para lanzar"}</span>
+              </div>
+              <div className="roll-substeps-actions">
+                <button
+                  className={`primary ${rollingCharacteristic ? "rolling" : ""}`}
+                  type="button"
+                  onClick={handleRollNextCharacteristic}
+                  disabled={!nextCharacteristicToRoll || Boolean(rollingCharacteristic)}
+                >
+                  {rollingCharacteristic ? "Lanzando..." : `Lanzar ${nextCharacteristicToRoll ?? ""}`}
+                </button>
+                <button className="ghost" type="button" onClick={handleResetCharacteristicRolls}>
+                  Reiniciar tiradas
+                </button>
+              </div>
+              <p className="small">Ve lanzando una por una y observa como van quedando los valores.</p>
             </div>
-            {draft.mode === "random" ? (
-              <div className="card roll-substeps-card" style={{ gridColumn: "1 / -1" }}>
-                <p className="kpi">Subpaso 2.1: Tiradas de caracteristicas</p>
-                <p className="roll-progress">
-                  {completedCharacteristicCount} / {characteristicKeys.length} completadas
-                </p>
-                <p className="roll-next-step">
-                  {rollingCharacteristic
-                    ? `Lanzando ${rollingCharacteristic}...`
-                    : nextCharacteristicToRoll
-                      ? `Siguiente tirada: ${nextCharacteristicToRoll}`
-                      : "Tiradas completadas"}
-                </p>
-                {(rollingCharacteristic || nextCharacteristicToRoll) && (
-                  <p className="roll-source">
-                    Tirada:{` `}
-                    {getCharacteristicRollSource((rollingCharacteristic ?? nextCharacteristicToRoll) as CharacteristicKey)}
-                  </p>
-                )}
-                {rollingCharacteristic && (
-                  <p className="roll-breakdown">Preparando detalle de la tirada...</p>
-                )}
-                <div className={`dice-roll-indicator ${rollingCharacteristic ? "active" : ""}`} aria-live="polite">
-                  <span className="dice-icon" aria-hidden="true" />
-                  <span>{rollingCharacteristic ? "Tirada en curso" : "Listo para lanzar"}</span>
-                </div>
-                <div className="roll-substeps-actions">
-                  <button
-                    className={`primary ${rollingCharacteristic ? "rolling" : ""}`}
-                    type="button"
-                    onClick={handleRollNextCharacteristic}
-                    disabled={!nextCharacteristicToRoll || Boolean(rollingCharacteristic)}
-                  >
-                    {rollingCharacteristic ? "Lanzando..." : `Lanzar ${nextCharacteristicToRoll ?? ""}`}
-                  </button>
-                  <button className="ghost" type="button" onClick={handleResetCharacteristicRolls}>
-                    Reiniciar tiradas
-                  </button>
-                </div>
-                <p className="small">Ve lanzando una por una y observa como van quedando los valores.</p>
-              </div>
-            ) : (
-              <div className="card">
-                <p className="kpi">Subpaso 2.1: Entrada manual</p>
-                <p className="small">Introduce los valores manualmente en cada caracteristica.</p>
-              </div>
-            )}
-            {randomModeVisibleCharacteristicKeys.map((key) => (
+            {visibleCharacteristicKeys.map((key) => (
               <div
                 className={`card characteristic-card ${nextCharacteristicToRoll === key ? "current" : ""} ${
                   rollingCharacteristic === key ? "rolling" : ""
@@ -804,7 +788,7 @@ export function Wizard({ step }: { step: number }) {
                   max={99}
                   value={draft.characteristics[key] ?? ""}
                   onChange={(e) => setCharacteristic(key, Number(e.target.value))}
-                  disabled={draft.mode === "random"}
+                  disabled
                 />
               </div>
             ))}

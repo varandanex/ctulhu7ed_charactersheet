@@ -741,12 +741,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
       });
     }
 
-    if (
-      draft.mode === "random" &&
-      hasAllCharacteristics(draft) &&
-      typeof draft.lastRolledAge === "number" &&
-      draft.lastRolledAge !== draft.age
-    ) {
+    if (hasAllCharacteristics(draft) && typeof draft.lastRolledAge === "number" && draft.lastRolledAge !== draft.age) {
       issues.push({
         code: "AGE_ROLL_MISMATCH",
         message: "La edad cambio tras la tirada aleatoria. Repite la tirada para reaplicar modificadores de edad.",
