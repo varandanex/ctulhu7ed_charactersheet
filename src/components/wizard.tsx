@@ -120,6 +120,52 @@ function getEduImprovementRolls(age: number): number {
   return 0;
 }
 
+function clampPenaltyAllocation(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(value));
+}
+
+function getCharacteristicAgeModifier(
+  key: CharacteristicKey,
+  age: number,
+  allocation: typeof defaultAgePenaltyAllocation,
+): number {
+  let modifier = 0;
+  const matureTarget = getMaturePenaltyTarget(age);
+  const defaultMatureFuePenalty = Math.floor(matureTarget / 3);
+  const defaultMatureConPenalty = Math.floor(matureTarget / 3);
+  const defaultMatureDesPenalty = matureTarget - defaultMatureFuePenalty - defaultMatureConPenalty;
+
+  if (age >= 15 && age <= 19) {
+    const youthFue = clampPenaltyAllocation(allocation.youthFuePenalty);
+    const youthTam = clampPenaltyAllocation(allocation.youthTamPenalty);
+    const youthTotal = youthFue + youthTam;
+    const fuePenalty = youthTotal === 5 ? youthFue : defaultAgePenaltyAllocation.youthFuePenalty;
+    const tamPenalty = youthTotal === 5 ? youthTam : defaultAgePenaltyAllocation.youthTamPenalty;
+    if (key === "FUE") modifier -= fuePenalty;
+    if (key === "TAM") modifier -= tamPenalty;
+    if (key === "EDU") modifier -= 5;
+  }
+
+  if (matureTarget > 0) {
+    const matureFue = clampPenaltyAllocation(allocation.matureFuePenalty);
+    const matureCon = clampPenaltyAllocation(allocation.matureConPenalty);
+    const matureDes = clampPenaltyAllocation(allocation.matureDesPenalty);
+    const matureTotal = matureFue + matureCon + matureDes;
+    const fuePenalty = matureTotal === matureTarget ? matureFue : defaultMatureFuePenalty;
+    const conPenalty = matureTotal === matureTarget ? matureCon : defaultMatureConPenalty;
+    const desPenalty = matureTotal === matureTarget ? matureDes : defaultMatureDesPenalty;
+    const apaPenalty = age >= 80 ? 25 : age >= 70 ? 20 : age >= 60 ? 15 : age >= 50 ? 10 : 5;
+
+    if (key === "FUE") modifier -= fuePenalty;
+    if (key === "CON") modifier -= conPenalty;
+    if (key === "DES") modifier -= desPenalty;
+    if (key === "APA") modifier -= apaPenalty;
+  }
+
+  return modifier;
+}
+
 function getAgeGuidance(age: number): string[] {
   if (age >= 15 && age <= 19) {
     return [
@@ -147,6 +193,19 @@ function getAgeGuidance(age: number): string[] {
   return ["Resta 80 puntos entre FUE/CON/DES.", "Reduce APA en 25.", "Haz 4 tiradas de mejora de EDU."];
 }
 
+function getAgeGuidanceTone(line: string): "negative" | "positive" | "neutral" {
+  const normalized = line.toLowerCase();
+  if (normalized.includes("resta") || normalized.includes("reduce") || normalized.includes("menos")) return "negative";
+  if (
+    normalized.includes("mejor de dos") ||
+    normalized.includes("haz") ||
+    normalized.includes("eliges") ||
+    normalized.includes("resultado mayor")
+  )
+    return "positive";
+  return "neutral";
+}
+
 function getTargetState(current: number, expected: number): "ok" | "warn" | "over" {
   if (current === expected) return "ok";
   if (current < expected) return "warn";
@@ -157,18 +216,14 @@ function formatRollFormula(formula: string): string {
   return formula.replace(/x/gi, " x ");
 }
 
-function getFormulaModifierTokens(formula: string): string[] {
+function getFormulaModifierTokens(formula: string): { additive: string[]; multiplier: string | null } {
   const normalized = formula.replace(/\s+/g, "");
-  const tokens: string[] = [];
   const additive = normalized.match(/[+-]\d+/g) ?? [];
-  for (const value of additive) {
-    tokens.push(value);
-  }
   const multiplier = normalized.match(/x(\d+)/i);
-  if (multiplier) {
-    tokens.push(`x${multiplier[1]}`);
-  }
-  return tokens;
+  return {
+    additive,
+    multiplier: multiplier ? `x${multiplier[1]}` : null,
+  };
 }
 
 function getCharacteristicDiceCount(key: CharacteristicKey): number {
@@ -379,9 +434,15 @@ export function Wizard({ step }: { step: number }) {
       : Math.max(1, Math.min(3, diceValues.length || 3));
   const highlightedFormulaModifiers = highlightedCharacteristic
     ? getFormulaModifierTokens(rulesCatalog.characteristics_generation[highlightedCharacteristic])
-    : [];
+    : { additive: [], multiplier: null };
+  const highlightedAgeModifier = highlightedCharacteristic
+    ? getCharacteristicAgeModifier(highlightedCharacteristic, draft.age, agePenaltyAllocation)
+    : 0;
   const showDiceSumPlus =
     highlightedCharacteristic && isDiceSumFormula(rulesCatalog.characteristics_generation[highlightedCharacteristic]);
+  const shouldWrapAdditiveGroup =
+    showDiceSumPlus &&
+    (highlightedFormulaModifiers.additive.length > 0 || Boolean(highlightedFormulaModifiers.multiplier));
   const highlightedRollValue =
     highlightedCharacteristic && typeof draft.characteristics[highlightedCharacteristic] === "number"
       ? draft.characteristics[highlightedCharacteristic]
@@ -819,26 +880,20 @@ export function Wizard({ step }: { step: number }) {
             </div>
             <div className="card" style={{ gridColumn: "1 / -1" }}>
               <p className="kpi">Que implica esta edad</p>
-              <ul className="age-guidance-list">
+              <div className="age-guidance-badges">
                 {ageGuidance.map((line) => (
-                  <li key={line}>{line}</li>
+                  <span key={line} className={`age-guidance-badge age-guidance-badge--${getAgeGuidanceTone(line)}`}>
+                    {line}
+                  </span>
                 ))}
-              </ul>
-            </div>
-            <div className="card" style={{ gridColumn: "1 / -1" }}>
-              <p className="kpi">Reglas activas por edad ({draft.age})</p>
-              <div className="age-rule-grid">
-                <p>
-                  Mejoras de EDU: <strong>{eduImprovementRolls}</strong>
-                </p>
-                <p>
-                  Penalizador MOV por edad: <strong>-{draft.age >= 40 ? Math.min(5, Math.floor(draft.age / 10) - 3) : 0}</strong>
-                </p>
-                {draft.age >= 40 && (
-                  <p>
-                    Penalizador APA: <strong>-{draft.age >= 80 ? 25 : draft.age >= 70 ? 20 : draft.age >= 60 ? 15 : draft.age >= 50 ? 10 : 5}</strong>
-                  </p>
-                )}
+                {(() => {
+                  const movPenalty = draft.age >= 40 ? Math.min(5, Math.floor(draft.age / 10) - 3) : 0;
+                  return (
+                    <span className={`age-guidance-badge ${movPenalty > 0 ? "age-guidance-badge--negative" : "age-guidance-badge--neutral"}`}>
+                      Penalizador MOV por edad: {movPenalty > 0 ? `-${movPenalty}` : "0"}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
             {draft.age >= 15 && draft.age <= 19 && (
@@ -936,7 +991,7 @@ export function Wizard({ step }: { step: number }) {
               <div className={`dice-roller-3d ${rollingCharacteristic ? "active" : ""} ${!rollingCharacteristic && diceValues.length > 0 ? "settled" : ""}`} aria-hidden="true">
                 <div className="dice-expression-group">
                   <div className="dice-sum-group">
-                    {showDiceSumPlus && <span className="dice-group-paren">(</span>}
+                    {shouldWrapAdditiveGroup && <span className="dice-group-paren">(</span>}
                     {[0, 1, 2].map((index) => {
                       const value = diceValues[index] ?? 1;
                       const style = {
@@ -959,15 +1014,34 @@ export function Wizard({ step }: { step: number }) {
                         </Fragment>
                       );
                     })}
-                    {showDiceSumPlus && <span className="dice-group-paren">)</span>}
-                  </div>
-                  {highlightedFormulaModifiers.length > 0 && (
-                    <p className="dice-formula-modifiers" aria-live="polite">
-                      {highlightedFormulaModifiers.map((modifier) => (
-                        <span key={`modifier-${highlightedCharacteristic}-${modifier}`} className="dice-formula-modifier-chip">
+                    {highlightedFormulaModifiers.additive.map((modifier) => (
+                        <span
+                          key={`modifier-${highlightedCharacteristic}-${modifier}`}
+                          className={`dice-formula-modifier-chip ${modifier.startsWith("-") ? "dice-formula-modifier-chip--negative" : ""}`}
+                        >
                           {modifier}
                         </span>
                       ))}
+                    {shouldWrapAdditiveGroup && <span className="dice-group-paren">)</span>}
+                  </div>
+                  {highlightedFormulaModifiers.multiplier && (
+                    <p className="dice-formula-modifiers" aria-live="polite">
+                      <span
+                        key={`modifier-${highlightedCharacteristic}-${highlightedFormulaModifiers.multiplier}`}
+                        className="dice-formula-modifier-chip"
+                      >
+                        {highlightedFormulaModifiers.multiplier}
+                      </span>
+                    </p>
+                  )}
+                  {highlightedAgeModifier !== 0 && (
+                    <p className="dice-formula-modifiers" aria-live="polite">
+                      <span
+                        key={`modifier-age-${highlightedCharacteristic}-${highlightedAgeModifier}`}
+                        className={`dice-formula-modifier-chip ${highlightedAgeModifier < 0 ? "dice-formula-modifier-chip--negative" : ""}`}
+                      >
+                        {highlightedAgeModifier > 0 ? `+${highlightedAgeModifier}` : `${highlightedAgeModifier}`} (edad)
+                      </span>
                     </p>
                   )}
                 </div>
