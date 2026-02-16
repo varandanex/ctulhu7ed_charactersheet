@@ -7,6 +7,7 @@ import type {
   CharacterCompanion,
   CharacterDraft,
   CharacteristicKey,
+  Characteristics,
   CharacterIdentity,
   OccupationSelection,
 } from "@/domain/types";
@@ -19,6 +20,16 @@ const defaultAgePenaltyAllocation: AgePenaltyAllocation = {
   matureConPenalty: 1,
   matureDesPenalty: 3,
 };
+const characteristicKeys: CharacteristicKey[] = ["FUE", "CON", "TAM", "DES", "APA", "INT", "POD", "EDU", "SUERTE"];
+
+function normalizeCharacteristicValue(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
 
 function normalizeEra(era: string | undefined): string {
   if (era === "clasica" || era === "actual") return era;
@@ -70,6 +81,9 @@ interface CharacterStore {
   setEra: (era: string) => void;
   setAgePenaltyAllocation: (allocation: Partial<AgePenaltyAllocation>) => void;
   rollAllCharacteristics: () => void;
+  setLastRolledAge: (age: number | undefined) => void;
+  clearCharacteristics: () => void;
+  setCharacteristics: (characteristics: Partial<Characteristics>) => void;
   setCharacteristic: (key: CharacteristicKey, value: number) => void;
   setOccupation: (occupation: OccupationSelection) => void;
   setSkill: (bucket: "occupation" | "personal", skill: string, points: number) => void;
@@ -110,6 +124,31 @@ export const useCharacterStore = create<CharacterStore>()(
               state.draft.age,
               state.draft.agePenaltyAllocation,
             ),
+          },
+        })),
+      setLastRolledAge: (age) =>
+        set((state) => ({
+          draft: {
+            ...state.draft,
+            lastRolledAge: age,
+          },
+        })),
+      clearCharacteristics: () =>
+        set((state) => ({
+          draft: {
+            ...state.draft,
+            lastRolledAge: undefined,
+            characteristics: {},
+          },
+        })),
+      setCharacteristics: (characteristics) =>
+        set((state) => ({
+          draft: {
+            ...state.draft,
+            characteristics: {
+              ...state.draft.characteristics,
+              ...characteristics,
+            },
           },
         })),
       setCharacteristic: (key, value) =>
@@ -179,8 +218,16 @@ export const useCharacterStore = create<CharacterStore>()(
               ...persistedDraft?.agePenaltyAllocation,
             },
             characteristics: {
-              ...emptyDraft.characteristics,
-              ...persistedDraft?.characteristics,
+              ...characteristicKeys.reduce(
+                (acc, key) => {
+                  const normalized = normalizeCharacteristicValue(persistedDraft?.characteristics?.[key]);
+                  if (typeof normalized === "number") {
+                    acc[key] = normalized;
+                  }
+                  return acc;
+                },
+                {} as CharacterDraft["characteristics"],
+              ),
             },
             skills: {
               occupation: {

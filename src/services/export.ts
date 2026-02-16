@@ -31,7 +31,8 @@ export function toPrintablePdfModel(sheet: CharacterSheet): PrintableCharacterMo
       { label: "PV", value: String(sheet.derivedStats.pv) },
       { label: "PM", value: String(sheet.derivedStats.pmInicial) },
       { label: "MOV", value: String(sheet.derivedStats.mov) },
-      { label: "DB", value: sheet.derivedStats.damageBonus },
+      { label: "BD", value: sheet.derivedStats.damageBonus },
+      { label: "Corpulencia", value: String(sheet.derivedStats.build) },
       {
         label: "Caracteristicas",
         value: Object.entries(sheet.characteristics)

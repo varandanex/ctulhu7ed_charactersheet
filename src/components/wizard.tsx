@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { investigatorSkillsCatalog, professionCatalog, stepsCatalog } from "@/rules-data/catalog";
+import { investigatorSkillsCatalog, professionCatalog, rulesCatalog, stepsCatalog } from "@/rules-data/catalog";
 import { getSkillHelp } from "@/rules-data/skill-help";
 import {
   buildDefaultChoiceSelections,
@@ -16,6 +16,7 @@ import {
   evaluateOccupationPointsFormula,
   extractOccupationFormulaChoiceGroups,
   finalizeCharacter,
+  rollCharacteristicWithAgeModifiersDetailed,
   validateStep,
 } from "@/domain/rules";
 import { getFinanceByCredit } from "@/domain/finance";
@@ -97,10 +98,41 @@ function getEduImprovementRolls(age: number): number {
   return 0;
 }
 
+function getAgeGuidance(age: number): string[] {
+  if (age >= 15 && age <= 19) {
+    return [
+      "Resta 5 puntos entre FUE y TAM.",
+      "EDU comienza con 5 puntos menos.",
+      "SUERTE se tira dos veces y eliges el resultado mayor.",
+      "No hay tiradas de mejora de EDU por edad.",
+    ];
+  }
+  if (age >= 20 && age <= 39) {
+    return ["Haz 1 tirada de mejora de EDU."];
+  }
+  if (age >= 40 && age <= 49) {
+    return ["Resta 5 puntos entre FUE/CON/DES.", "Reduce APA en 5.", "Haz 2 tiradas de mejora de EDU."];
+  }
+  if (age >= 50 && age <= 59) {
+    return ["Resta 10 puntos entre FUE/CON/DES.", "Reduce APA en 10.", "Haz 3 tiradas de mejora de EDU."];
+  }
+  if (age >= 60 && age <= 69) {
+    return ["Resta 20 puntos entre FUE/CON/DES.", "Reduce APA en 15.", "Haz 4 tiradas de mejora de EDU."];
+  }
+  if (age >= 70 && age <= 79) {
+    return ["Resta 40 puntos entre FUE/CON/DES.", "Reduce APA en 20.", "Haz 4 tiradas de mejora de EDU."];
+  }
+  return ["Resta 80 puntos entre FUE/CON/DES.", "Reduce APA en 25.", "Haz 4 tiradas de mejora de EDU."];
+}
+
 function getTargetState(current: number, expected: number): "ok" | "warn" | "over" {
   if (current === expected) return "ok";
   if (current < expected) return "warn";
   return "over";
+}
+
+function formatRollFormula(formula: string): string {
+  return formula.replace(/x/gi, " x ");
 }
 
 function Issues({ issues }: { issues: ValidationIssue[] }) {
@@ -120,10 +152,13 @@ export function Wizard({ step }: { step: number }) {
   const router = useRouter();
   const [mobilePointsOpen, setMobilePointsOpen] = useState(false);
   const [helpSkillOpen, setHelpSkillOpen] = useState<string | null>(null);
+  const [rollingCharacteristic, setRollingCharacteristic] = useState<CharacteristicKey | null>(null);
+  const [characteristicRollDetails, setCharacteristicRollDetails] = useState<Partial<Record<CharacteristicKey, string[]>>>({});
   const [occupationSlideIndex, setOccupationSlideIndex] = useState(0);
   const [occupationImageErrors, setOccupationImageErrors] = useState<Record<string, boolean>>({});
   const [occupationImageLoaded, setOccupationImageLoaded] = useState<Record<string, boolean>>({});
   const [occupationImageOrientation, setOccupationImageOrientation] = useState<Record<string, "portrait" | "landscape">>({});
+  const rollTimeoutRef = useRef<number | null>(null);
   const occupationTouchStartX = useRef<number | null>(null);
   const occupationTouchStartY = useRef<number | null>(null);
   const occupationTouchCurrentX = useRef<number | null>(null);
@@ -132,9 +167,9 @@ export function Wizard({ step }: { step: number }) {
     draft,
     setMode,
     setAge,
-    setEra,
     setAgePenaltyAllocation,
-    rollAllCharacteristics,
+    setLastRolledAge,
+    clearCharacteristics,
     setCharacteristic,
     setOccupation,
     setSkill,
@@ -151,7 +186,7 @@ export function Wizard({ step }: { step: number }) {
 
   const occupation = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
   const occupationCreditRange = occupation ? parseCreditRange(occupation.credit_range) : null;
-  const selectedEra = draft.era ?? "clasica";
+  const selectedEra = draft.era === "actual" ? "clasica" : (draft.era ?? "clasica");
   const allOccupations = useMemo(() => {
     if (selectedEra === "actual") return professionCatalog.occupations;
     return professionCatalog.occupations.filter((item) => !item.tags.includes("actual"));
@@ -217,7 +252,18 @@ export function Wizard({ step }: { step: number }) {
   const occupationRemainingBudget = Math.max(occupationRemaining, 0);
   const personalRemainingBudget = Math.max(personalRemaining, 0);
   const agePenaltyAllocation = draft.agePenaltyAllocation ?? defaultAgePenaltyAllocation;
+  const completedCharacteristicCount = characteristicKeys.filter((key) => typeof draft.characteristics[key] === "number").length;
+  const nextCharacteristicToRoll = characteristicKeys.find((key) => typeof draft.characteristics[key] !== "number");
+  const allCharacteristicsRolled = completedCharacteristicCount === characteristicKeys.length;
+  const randomModeVisibleCharacteristicKeys = useMemo(() => {
+    if (draft.mode !== "random") return characteristicKeys;
+    if (rollingCharacteristic) return [rollingCharacteristic];
+    if (nextCharacteristicToRoll) return [nextCharacteristicToRoll];
+    const lastRolled = [...characteristicKeys].reverse().find((key) => typeof draft.characteristics[key] === "number");
+    return lastRolled ? [lastRolled] : [characteristicKeys[0]];
+  }, [draft.mode, draft.characteristics, rollingCharacteristic, nextCharacteristicToRoll]);
   const youthTarget = draft.age >= 15 && draft.age <= 19 ? 5 : 0;
+  const ageGuidance = useMemo(() => getAgeGuidance(draft.age), [draft.age]);
   const youthCurrent = agePenaltyAllocation.youthFuePenalty + agePenaltyAllocation.youthTamPenalty;
   const matureTarget = getMaturePenaltyTarget(draft.age);
   const matureCurrent =
@@ -246,6 +292,65 @@ export function Wizard({ step }: { step: number }) {
     if (remaining < 0) return "over";
     if (remaining === 0) return "ok";
     return "warn";
+  }
+
+  function handleRollNextCharacteristic() {
+    if (!nextCharacteristicToRoll || rollingCharacteristic) return;
+    const characteristicToRoll = nextCharacteristicToRoll;
+    if (typeof draft.lastRolledAge !== "number" || completedCharacteristicCount === 0) {
+      setLastRolledAge(draft.age);
+    }
+
+    setRollingCharacteristic(characteristicToRoll);
+    if (rollTimeoutRef.current !== null) {
+      window.clearTimeout(rollTimeoutRef.current);
+    }
+    rollTimeoutRef.current = window.setTimeout(() => {
+      const detail = rollCharacteristicWithAgeModifiersDetailed(characteristicToRoll, draft.age, agePenaltyAllocation);
+      setCharacteristic(characteristicToRoll, detail.finalValue);
+      setCharacteristicRollDetails((current) => ({
+        ...current,
+        [characteristicToRoll]: detail.steps,
+      }));
+      setRollingCharacteristic(null);
+      rollTimeoutRef.current = null;
+    }, 1000);
+  }
+
+  function handleResetCharacteristicRolls() {
+    if (rollTimeoutRef.current !== null) {
+      window.clearTimeout(rollTimeoutRef.current);
+      rollTimeoutRef.current = null;
+    }
+    setRollingCharacteristic(null);
+    setCharacteristicRollDetails({});
+    clearCharacteristics();
+  }
+
+  function getCharacteristicRollSource(key: CharacteristicKey): string {
+    const base = formatRollFormula(rulesCatalog.characteristics_generation[key]);
+    const details: string[] = [base];
+
+    if (draft.age >= 15 && draft.age <= 19) {
+      if (key === "FUE") details.push(`- ${agePenaltyAllocation.youthFuePenalty} (edad 15-19)`);
+      if (key === "TAM") details.push(`- ${agePenaltyAllocation.youthTamPenalty} (edad 15-19)`);
+      if (key === "EDU") details.push("- 5 (edad 15-19)");
+      if (key === "SUERTE") details.push("mejor de 2 tiradas");
+    }
+
+    if (draft.age >= 40) {
+      if (key === "FUE") details.push(`- ${agePenaltyAllocation.matureFuePenalty} (edad)`);
+      if (key === "CON") details.push(`- ${agePenaltyAllocation.matureConPenalty} (edad)`);
+      if (key === "DES") details.push(`- ${agePenaltyAllocation.matureDesPenalty} (edad)`);
+      if (key === "APA")
+        details.push(`- ${draft.age >= 80 ? 25 : draft.age >= 70 ? 20 : draft.age >= 60 ? 15 : draft.age >= 50 ? 10 : 5} (edad)`);
+    }
+
+    if (key === "EDU" && eduImprovementRolls > 0) {
+      details.push(`+ mejoras EDU (${eduImprovementRolls} tiradas 1D100 / +1D10 si mejora)`);
+    }
+
+    return details.join(" | ");
   }
 
   function handleSkillChange(bucket: "occupation" | "personal", skill: string, rawPoints: number) {
@@ -299,7 +404,7 @@ export function Wizard({ step }: { step: number }) {
 
   function goNext() {
     if (!canContinue) return;
-    if (step >= 5) {
+    if (step >= 6) {
       router.push("/crear/resumen");
       return;
     }
@@ -316,6 +421,14 @@ export function Wizard({ step }: { step: number }) {
 
   const title = stepsCatalog.steps.find((item) => item.id === step)?.title ?? `Paso ${step}`;
   const activeSkillHelp = useMemo(() => (helpSkillOpen ? getSkillHelp(helpSkillOpen) : null), [helpSkillOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (rollTimeoutRef.current !== null) {
+        window.clearTimeout(rollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!helpSkillOpen) return;
@@ -336,7 +449,7 @@ export function Wizard({ step }: { step: number }) {
   }, [helpSkillOpen]);
 
   useEffect(() => {
-    if (step !== 2) return;
+    if (step !== 3) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       const element = document.activeElement as HTMLElement | null;
@@ -363,7 +476,7 @@ export function Wizard({ step }: { step: number }) {
   }, [step, goToNextOccupation, goToPreviousOccupation]);
 
   useEffect(() => {
-    if (step !== 2 || !draft.occupation?.name) return;
+    if (step !== 3 || !draft.occupation?.name) return;
     const selectedIndex = allOccupations.findIndex((item) => item.name === draft.occupation?.name);
     if (selectedIndex >= 0) {
       setOccupationSlideIndex(selectedIndex);
@@ -371,7 +484,7 @@ export function Wizard({ step }: { step: number }) {
   }, [allOccupations, draft.occupation?.name, step]);
 
   useEffect(() => {
-    if (step !== 2 || !draft.occupation) return;
+    if (step !== 3 || !draft.occupation) return;
     const selectedOccupation = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
     if (!selectedOccupation) return;
     const requiredFormulaChoiceCount = extractOccupationFormulaChoiceGroups(selectedOccupation.occupation_points_formula).length;
@@ -496,10 +609,10 @@ export function Wizard({ step }: { step: number }) {
           ))}
           <button
             type="button"
-            className={`step-pill ${step === 6 ? "active" : ""}`}
+            className={`step-pill ${step === stepsCatalog.steps.length + 1 ? "active" : ""}`}
             onClick={() => router.push("/crear/resumen")}
           >
-            6. Resumen
+            {stepsCatalog.steps.length + 1}. Resumen
           </button>
         </div>
         <p className="small step-nav-hint">Desliza la barra de pasos para ver todos los pasos.</p>
@@ -509,28 +622,16 @@ export function Wizard({ step }: { step: number }) {
         {step === 1 && (
           <div className="grid two">
             <div className="card">
-              <label>Modo</label>
-              <select value={draft.mode} onChange={(e) => setMode(e.target.value as "random" | "manual")}>
-                <option value="random">Tirada aleatoria</option>
-                <option value="manual">Entrada manual</option>
-              </select>
-            </div>
-            <div className="card">
               <label>Edad (15-89)</label>
               <input type="number" min={15} max={89} value={draft.age} onChange={(e) => setAge(Number(e.target.value))} />
             </div>
-            <div className="card">
-              <label>Ambientacion</label>
-              <select value={selectedEra} onChange={(e) => setEra(e.target.value)}>
-                <option value="clasica">Años 20 (Lovecraft clasica)</option>
-                <option value="actual">Era actual</option>
-              </select>
-            </div>
-            <div className="card">
-              <button className="primary" type="button" onClick={rollAllCharacteristics}>
-                Tirar todo
-              </button>
-              <p className="small">Si usas modo manual, puedes editar cada valor abajo.</p>
+            <div className="card" style={{ gridColumn: "1 / -1" }}>
+              <p className="kpi">Que implica esta edad</p>
+              <ul className="age-guidance-list">
+                {ageGuidance.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
             </div>
             <div className="card" style={{ gridColumn: "1 / -1" }}>
               <p className="kpi">Reglas activas por edad ({draft.age})</p>
@@ -619,26 +720,103 @@ export function Wizard({ step }: { step: number }) {
                 </p>
               </div>
             )}
-            {characteristicKeys.map((key) => (
-              <div className="card" key={key}>
-                <label>{key}</label>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="grid two">
+            <div className="card">
+              <label>Modo</label>
+              <select value={draft.mode} onChange={(e) => setMode(e.target.value as "random" | "manual")}>
+                <option value="random">Tirada aleatoria</option>
+                <option value="manual">Entrada manual</option>
+              </select>
+            </div>
+            {draft.mode === "random" ? (
+              <div className="card roll-substeps-card" style={{ gridColumn: "1 / -1" }}>
+                <p className="kpi">Subpaso 2.1: Tiradas de caracteristicas</p>
+                <p className="roll-progress">
+                  {completedCharacteristicCount} / {characteristicKeys.length} completadas
+                </p>
+                <p className="roll-next-step">
+                  {rollingCharacteristic
+                    ? `Lanzando ${rollingCharacteristic}...`
+                    : nextCharacteristicToRoll
+                      ? `Siguiente tirada: ${nextCharacteristicToRoll}`
+                      : "Tiradas completadas"}
+                </p>
+                {(rollingCharacteristic || nextCharacteristicToRoll) && (
+                  <p className="roll-source">
+                    Tirada:{` `}
+                    {getCharacteristicRollSource((rollingCharacteristic ?? nextCharacteristicToRoll) as CharacteristicKey)}
+                  </p>
+                )}
+                {rollingCharacteristic && (
+                  <p className="roll-breakdown">Preparando detalle de la tirada...</p>
+                )}
+                <div className={`dice-roll-indicator ${rollingCharacteristic ? "active" : ""}`} aria-live="polite">
+                  <span className="dice-icon" aria-hidden="true" />
+                  <span>{rollingCharacteristic ? "Tirada en curso" : "Listo para lanzar"}</span>
+                </div>
+                <div className="roll-substeps-actions">
+                  <button
+                    className={`primary ${rollingCharacteristic ? "rolling" : ""}`}
+                    type="button"
+                    onClick={handleRollNextCharacteristic}
+                    disabled={!nextCharacteristicToRoll || Boolean(rollingCharacteristic)}
+                  >
+                    {rollingCharacteristic ? "Lanzando..." : `Lanzar ${nextCharacteristicToRoll ?? ""}`}
+                  </button>
+                  <button className="ghost" type="button" onClick={handleResetCharacteristicRolls}>
+                    Reiniciar tiradas
+                  </button>
+                </div>
+                <p className="small">Ve lanzando una por una y observa como van quedando los valores.</p>
+              </div>
+            ) : (
+              <div className="card">
+                <p className="kpi">Subpaso 2.1: Entrada manual</p>
+                <p className="small">Introduce los valores manualmente en cada caracteristica.</p>
+              </div>
+            )}
+            {randomModeVisibleCharacteristicKeys.map((key) => (
+              <div
+                className={`card characteristic-card ${nextCharacteristicToRoll === key ? "current" : ""} ${
+                  rollingCharacteristic === key ? "rolling" : ""
+                } ${
+                  typeof draft.characteristics[key] === "number" ? "done" : ""
+                }`}
+                key={key}
+              >
+                <p className="characteristic-label">{key}</p>
+                <p className="characteristic-value">{rollingCharacteristic === key ? "..." : (draft.characteristics[key] ?? "--")}</p>
+                <p className="characteristic-roll-source">{getCharacteristicRollSource(key)}</p>
+                {(characteristicRollDetails[key] ?? []).length > 0 && (
+                  <div className="characteristic-roll-detail">
+                    {(characteristicRollDetails[key] ?? []).map((line, index) => (
+                      <p key={`${key}-detail-${index}`}>{line}</p>
+                    ))}
+                  </div>
+                )}
                 <input
                   type="number"
                   min={1}
                   max={99}
                   value={draft.characteristics[key] ?? ""}
                   onChange={(e) => setCharacteristic(key, Number(e.target.value))}
+                  disabled={draft.mode === "random"}
                 />
               </div>
             ))}
-            {characteristicKeys.every((key) => typeof draft.characteristics[key] === "number") && (
+            {allCharacteristicsRolled && (
               <div className="card" style={{ gridColumn: "1 / -1" }}>
                 <p className="kpi">Derivados previos:</p>
                 {(() => {
                   const derived = computeDerivedStats(draft.characteristics as any, draft.age);
                   return (
                     <p>
-                      PV {derived.pv} | PM {derived.pmInicial} | MOV {derived.mov} | DB {derived.damageBonus} | Build {derived.build}
+                      PV {derived.pv} | PM {derived.pmInicial} | MOV {derived.mov} | BD {derived.damageBonus} | Corpulencia{" "}
+                      {derived.build}
                     </p>
                   );
                 })()}
@@ -647,7 +825,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <div className="grid">
             {activeOccupation && (
               <div
@@ -855,7 +1033,7 @@ export function Wizard({ step }: { step: number }) {
                     ))}
                     <p className="kpi">
                       Puntos de ocupacion resultantes:{" "}
-                      {draft.characteristics.INT ? occupationPoints : "completa caracteristicas en paso 1 para calcular"}
+                      {draft.characteristics.INT ? occupationPoints : "completa caracteristicas en paso 2 para calcular"}
                     </p>
                   </div>
                 )}
@@ -864,7 +1042,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div className="skills-layout">
             <aside className="points-sidebar">
               <div className="card points-card">
@@ -1023,7 +1201,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <div className="grid two">
             <div className="card" style={{ gridColumn: "1 / -1" }}>
               <p className="kpi">Trasfondo</p>
@@ -1147,7 +1325,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 5 && (
+        {step === 6 && (
           <div className="grid">
             <div className="card">
               <p className="kpi">Finanzas (segun Credito)</p>
@@ -1194,7 +1372,7 @@ export function Wizard({ step }: { step: number }) {
             Atras
           </button>
           <button className="primary" type="button" onClick={goNext} disabled={!canContinue}>
-            {step >= 5 ? "Ir al resumen" : "Siguiente"}
+            {step >= 6 ? "Ir al resumen" : "Siguiente"}
           </button>
           <button
             className="ghost"
@@ -1279,7 +1457,7 @@ export function Summary() {
         )}
 
         <div className="actions">
-          <button className="ghost" type="button" onClick={() => router.push("/crear/5")}>
+          <button className="ghost" type="button" onClick={() => router.push("/crear/6")}>
             Volver a editar
           </button>
           <button

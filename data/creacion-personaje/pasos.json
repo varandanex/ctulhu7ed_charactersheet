@@ -3,30 +3,36 @@
   "steps": [
     {
       "id": 1,
+      "key": "determinar_edad",
+      "title": "Determinar edad",
+      "description": "Elegir edad del investigador y configurar los ajustes por rango de edad."
+    },
+    {
+      "id": 2,
       "key": "generar_caracteristicas",
       "title": "Generar caracteristicas",
       "description": "Generar FUE, CON, TAM, DES, APA, INT, POD, EDU y Suerte; aplicar edad y calcular derivados basicos."
     },
     {
-      "id": 2,
+      "id": 3,
       "key": "determinar_ocupacion",
       "title": "Determinar ocupacion",
       "description": "Elegir profesion, rango de Credito y conjunto de habilidades de ocupacion."
     },
     {
-      "id": 3,
+      "id": 4,
       "key": "habilidades",
       "title": "Elegir habilidades y distribuir puntos",
       "description": "Asignar puntos de ocupacion y puntos de interes particular (INT x2)."
     },
     {
-      "id": 4,
+      "id": 5,
       "key": "trasfondo",
       "title": "Crear trasfondo",
       "description": "Definir historia personal, motivaciones, allegados, rasgos y elementos clave del personaje."
     },
     {
-      "id": 5,
+      "id": 6,
       "key": "equipo",
       "title": "Equipar investigador",
       "description": "Determinar dinero/propiedades y anotar equipo, armas y objetos relevantes."

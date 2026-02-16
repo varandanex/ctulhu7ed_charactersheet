@@ -4,6 +4,8 @@ import {
   computeSkillBreakdown,
   computeDerivedStats,
   evaluateOccupationPointsFormula,
+  rollCharacteristicWithAgeModifiers,
+  rollCharacteristicWithAgeModifiersDetailed,
   validateStep,
   validateSkillAllocation,
 } from "@/domain/rules";
@@ -143,7 +145,7 @@ describe("domain rules", () => {
       equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
     };
 
-    const issues = validateStep(3, draft);
+    const issues = validateStep(4, draft);
     expect(issues.some((issue) => issue.code === "OCCUPATION_POINTS_EXCEEDED")).toBe(true);
   });
 
@@ -181,11 +183,11 @@ describe("domain rules", () => {
       equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
     };
 
-    const issues = validateStep(3, draft);
+    const issues = validateStep(4, draft);
     expect(issues.some((issue) => issue.code === "INVALID_OCCUPATION_SKILL")).toBe(true);
   });
 
-  it("requires minimum background and core connection in step 4", () => {
+  it("requires minimum background and core connection in step 5", () => {
     const draft: CharacterDraft = {
       mode: "manual",
       age: 25,
@@ -227,12 +229,12 @@ describe("domain rules", () => {
       equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
     };
 
-    const missingCoreFields = validateStep(4, draft);
+    const missingCoreFields = validateStep(5, draft);
     expect(missingCoreFields.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
     expect(missingCoreFields.some((issue) => issue.code === "MISSING_CORE_CONNECTION")).toBe(true);
 
     draft.background.vinculoPrincipal = "Su hermana Clara";
-    const completeBackground = validateStep(4, draft);
+    const completeBackground = validateStep(5, draft);
     expect(completeBackground.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
     expect(completeBackground.some((issue) => issue.code === "MISSING_CORE_CONNECTION")).toBe(false);
   });
@@ -261,7 +263,21 @@ describe("domain rules", () => {
       equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
     };
 
-    const issues = validateStep(1, draft);
+    const issues = validateStep(2, draft);
     expect(issues.some((issue) => issue.code === "AGE_ROLL_MISMATCH" && issue.severity === "warning")).toBe(true);
+  });
+
+  it("rolls a single characteristic with age modifiers applied", () => {
+    const rolled = rollCharacteristicWithAgeModifiers("EDU", 45, defaultAllocation);
+    expect(rolled).toBeGreaterThanOrEqual(1);
+    expect(rolled).toBeLessThanOrEqual(99);
+  });
+
+  it("returns detailed breakdown for single characteristic roll", () => {
+    const detail = rollCharacteristicWithAgeModifiersDetailed("FUE", 25, defaultAllocation);
+    expect(detail.steps.length).toBeGreaterThan(0);
+    expect(detail.steps[0]).toContain("3D6x5");
+    expect(detail.finalValue).toBeGreaterThanOrEqual(1);
+    expect(detail.finalValue).toBeLessThanOrEqual(99);
   });
 });

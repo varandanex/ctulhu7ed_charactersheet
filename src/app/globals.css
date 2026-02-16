@@ -30,6 +30,53 @@ body {
   min-height: 100dvh;
 }
 
+.home-floating-button {
+  position: fixed;
+  top: 30px;
+  left: calc((100vw - min(1180px, 94vw)) / 2 + 16px);
+  z-index: 120;
+  width: 46px;
+  height: 46px;
+  border: 1px solid #35504a;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(32, 49, 46, 0.96), rgba(22, 33, 31, 0.96));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #d7e9dc;
+  transition: transform 140ms ease, border-color 140ms ease, filter 140ms ease;
+}
+
+.home-floating-button:hover {
+  border-color: #4f7d71;
+  filter: brightness(1.08);
+}
+
+.home-floating-button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.home-floating-button svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+@media (max-width: 719px) {
+  .home-floating-button {
+    top: 18px;
+    left: calc((100vw - min(1180px, 94vw)) / 2 + 10px);
+    width: 42px;
+    height: 42px;
+  }
+
+  .home-floating-button svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -280,6 +327,145 @@ button:disabled {
   color: var(--text-muted);
 }
 
+.roll-substeps-card {
+  display: grid;
+  gap: 8px;
+}
+
+.roll-progress {
+  margin: 0;
+  font-size: clamp(1.2rem, 3.6vw, 1.8rem);
+  font-weight: 700;
+}
+
+.roll-next-step {
+  margin: 0;
+  font-size: clamp(1.05rem, 3.1vw, 1.35rem);
+  color: #d7e9dc;
+}
+
+.roll-source {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #bcd0c9;
+}
+
+.roll-breakdown {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #93a8a3;
+}
+
+.roll-substeps-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.roll-substeps-actions button {
+  width: auto;
+  min-width: 170px;
+}
+
+.dice-roll-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #3b4f52;
+  color: #b8c8c5;
+  background: rgba(17, 24, 25, 0.8);
+  font-size: 0.85rem;
+}
+
+.dice-roll-indicator.active {
+  border-color: #5a7f72;
+  color: #d6e8dd;
+}
+
+.dice-icon {
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.dice-roll-indicator.active .dice-icon {
+  animation: dice-jitter 480ms linear infinite;
+}
+
+.characteristic-card {
+  display: grid;
+  gap: 8px;
+}
+
+.characteristic-card.current {
+  border-color: #577f6f;
+  box-shadow: inset 0 0 0 1px rgba(143, 190, 108, 0.3);
+}
+
+.characteristic-card.done {
+  border-color: #3f5a50;
+}
+
+.characteristic-card.rolling {
+  border-color: #699886;
+  box-shadow: 0 0 0 1px rgba(143, 190, 108, 0.32) inset;
+  animation: card-roll-shake 240ms ease-in-out infinite alternate;
+}
+
+.characteristic-label {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.characteristic-value {
+  margin: 0;
+  font-size: clamp(1.6rem, 4.3vw, 2.2rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.characteristic-roll-source {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #9db0ac;
+  line-height: 1.35;
+}
+
+.characteristic-roll-detail {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #2f3d3f;
+  background: rgba(15, 21, 22, 0.8);
+}
+
+.characteristic-roll-detail p {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #c5d4d0;
+  line-height: 1.3;
+}
+
+.characteristic-card.rolling .characteristic-value {
+  animation: value-flicker 320ms ease-in-out infinite;
+}
+
+.characteristic-card input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primary.rolling {
+  filter: brightness(1.08);
+}
+
 .age-rule-grid {
   display: grid;
   gap: 8px;
@@ -288,6 +474,18 @@ button:disabled {
 
 .age-rule-grid p {
   margin: 0;
+}
+
+.age-guidance-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.age-guidance-list li {
+  color: #d7e3de;
+  line-height: 1.35;
 }
 
 .formula-choice-block {
@@ -702,6 +900,43 @@ button:disabled {
 @keyframes occupation-spinner {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes dice-jitter {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(1px, -1px) rotate(-8deg);
+  }
+  50% {
+    transform: translate(-1px, 1px) rotate(5deg);
+  }
+  75% {
+    transform: translate(1px, 1px) rotate(-4deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+@keyframes card-roll-shake {
+  from {
+    transform: translateX(-1px);
+  }
+  to {
+    transform: translateX(1px);
+  }
+}
+
+@keyframes value-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }
 

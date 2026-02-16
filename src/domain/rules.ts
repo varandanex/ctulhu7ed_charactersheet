@@ -22,15 +22,35 @@ export interface OccupationFormulaChoiceGroup {
   options: string[];
 }
 
-function rollDice(times: number, sides: number): number {
-  let total = 0;
+export interface RollFormulaDetail {
+  formula: string;
+  rolls: number[];
+  add: number;
+  multiplier: number;
+  subtotal: number;
+  total: number;
+}
+
+export interface CharacteristicRollDetail {
+  key: keyof Characteristics;
+  base: RollFormulaDetail;
+  finalValue: number;
+  steps: string[];
+}
+
+function rollDiceValues(times: number, sides: number): number[] {
+  const rolls: number[] = [];
   for (let i = 0; i < times; i += 1) {
-    total += Math.floor(Math.random() * sides) + 1;
+    rolls.push(Math.floor(Math.random() * sides) + 1);
   }
-  return total;
+  return rolls;
 }
 
 function evaluateRollFormula(formula: string): number {
+  return evaluateRollFormulaDetailed(formula).total;
+}
+
+function evaluateRollFormulaDetailed(formula: string): RollFormulaDetail {
   const clean = formula.replace(/\s+/g, "");
   const match = clean.match(/^(?:\((\d+)D(\d+)\+(\d+)\)|(\d+)D(\d+))(?:x(\d+))?$/i);
   if (!match) {
@@ -41,8 +61,19 @@ function evaluateRollFormula(formula: string): number {
   const groupedSides = match[2] ? Number(match[2]) : Number(match[5]);
   const groupedAdd = match[3] ? Number(match[3]) : 0;
   const multiplier = match[6] ? Number(match[6]) : 1;
+  const rolls = rollDiceValues(groupedTimes, groupedSides);
+  const rollsTotal = rolls.reduce((sum, value) => sum + value, 0);
+  const subtotal = rollsTotal + groupedAdd;
+  const total = subtotal * multiplier;
 
-  return (rollDice(groupedTimes, groupedSides) + groupedAdd) * multiplier;
+  return {
+    formula,
+    rolls,
+    add: groupedAdd,
+    multiplier,
+    subtotal,
+    total,
+  };
 }
 
 function stripOuterParentheses(input: string): string {
@@ -161,13 +192,33 @@ function applyEduImprovements(currentEdu: number, age: number): number {
   const rolls = getEduImprovementRolls(age);
 
   for (let i = 0; i < rolls; i += 1) {
-    const d100 = rollDice(1, 100);
+    const d100 = rollDiceValues(1, 100)[0];
     if (d100 > edu) {
-      edu = Math.min(99, edu + rollDice(1, 10));
+      edu = Math.min(99, edu + rollDiceValues(1, 10)[0]);
     }
   }
 
   return edu;
+}
+
+function applyEduImprovementsDetailed(currentEdu: number, age: number): { value: number; steps: string[] } {
+  let edu = currentEdu;
+  const rolls = getEduImprovementRolls(age);
+  const steps: string[] = [];
+
+  for (let i = 0; i < rolls; i += 1) {
+    const eduBefore = edu;
+    const d100 = rollDiceValues(1, 100)[0];
+    if (d100 > eduBefore) {
+      const improvement = rollDiceValues(1, 10)[0];
+      edu = Math.min(99, edu + improvement);
+      steps.push(`Mejora EDU ${i + 1}: 1D100=${d100} > ${eduBefore}, +1D10=${improvement} => ${edu}`);
+    } else {
+      steps.push(`Mejora EDU ${i + 1}: 1D100=${d100} <= ${eduBefore}, sin mejora`);
+    }
+  }
+
+  return { value: edu, steps };
 }
 
 function getDefaultAgePenaltyAllocation(age: number): AgePenaltyAllocation {
@@ -250,6 +301,103 @@ export function rollCharacteristics(): Characteristics {
     POD: evaluateRollFormula(generation.POD),
     EDU: evaluateRollFormula(generation.EDU),
     SUERTE: evaluateRollFormula(generation.SUERTE),
+  };
+}
+
+export function rollCharacteristicWithAgeModifiers(
+  key: keyof Characteristics,
+  age: number,
+  allocation: AgePenaltyAllocation = getDefaultAgePenaltyAllocation(age),
+): number {
+  return rollCharacteristicWithAgeModifiersDetailed(key, age, allocation).finalValue;
+}
+
+export function rollCharacteristicWithAgeModifiersDetailed(
+  key: keyof Characteristics,
+  age: number,
+  allocation: AgePenaltyAllocation = getDefaultAgePenaltyAllocation(age),
+): CharacteristicRollDetail {
+  const generation = rulesCatalog.characteristics_generation;
+  const base = evaluateRollFormulaDetailed(generation[key]);
+  let value = base.total;
+  const steps = [
+    `${base.formula}: [${base.rolls.join(", ")}]` +
+      `${base.add > 0 ? ` + ${base.add}` : ""} = ${base.subtotal}` +
+      `${base.multiplier > 1 ? ` x${base.multiplier}` : ""} => ${base.total}`,
+  ];
+  const fallback = getDefaultAgePenaltyAllocation(age);
+
+  if (age >= 15 && age <= 19) {
+    const youthFue = clampPenaltyAllocation(allocation.youthFuePenalty);
+    const youthTam = clampPenaltyAllocation(allocation.youthTamPenalty);
+    const youthTotal = youthFue + youthTam;
+    const fuePenalty = youthTotal === 5 ? youthFue : fallback.youthFuePenalty;
+    const tamPenalty = youthTotal === 5 ? youthTam : fallback.youthTamPenalty;
+
+    if (key === "EDU") {
+      value = Math.max(1, value - 5);
+      steps.push(`Edad 15-19 EDU: -5 => ${value}`);
+    }
+    if (key === "FUE") {
+      value = Math.max(1, value - fuePenalty);
+      steps.push(`Edad 15-19 FUE: -${fuePenalty} => ${value}`);
+    }
+    if (key === "TAM") {
+      value = Math.max(1, value - tamPenalty);
+      steps.push(`Edad 15-19 TAM: -${tamPenalty} => ${value}`);
+    }
+    if (key === "SUERTE") {
+      const secondLuck = evaluateRollFormulaDetailed("3D6x5");
+      const secondValue = secondLuck.total;
+      const previous = value;
+      value = Math.max(value, secondValue);
+      steps.push(`Edad 15-19 SUERTE 2a: [${secondLuck.rolls.join(", ")}] = ${secondLuck.subtotal} x5 => ${secondValue}`);
+      steps.push(`Mejor de dos SUERTE: max(${previous}, ${secondValue}) => ${value}`);
+    }
+  }
+
+  const matureTotalRequired = getMaturePenaltyTotal(age);
+  if (matureTotalRequired > 0) {
+    const matureFue = clampPenaltyAllocation(allocation.matureFuePenalty);
+    const matureCon = clampPenaltyAllocation(allocation.matureConPenalty);
+    const matureDes = clampPenaltyAllocation(allocation.matureDesPenalty);
+    const matureTotal = matureFue + matureCon + matureDes;
+    const fuePenalty = matureTotal === matureTotalRequired ? matureFue : fallback.matureFuePenalty;
+    const conPenalty = matureTotal === matureTotalRequired ? matureCon : fallback.matureConPenalty;
+    const desPenalty = matureTotal === matureTotalRequired ? matureDes : fallback.matureDesPenalty;
+    const apaPenalty = age >= 80 ? 25 : age >= 70 ? 20 : age >= 60 ? 15 : age >= 50 ? 10 : 5;
+
+    if (key === "FUE") {
+      value = Math.max(1, value - fuePenalty);
+      steps.push(`Edad ${age} FUE: -${fuePenalty} => ${value}`);
+    }
+    if (key === "CON") {
+      value = Math.max(1, value - conPenalty);
+      steps.push(`Edad ${age} CON: -${conPenalty} => ${value}`);
+    }
+    if (key === "DES") {
+      value = Math.max(1, value - desPenalty);
+      steps.push(`Edad ${age} DES: -${desPenalty} => ${value}`);
+    }
+    if (key === "APA") {
+      value = Math.max(1, value - apaPenalty);
+      steps.push(`Edad ${age} APA: -${apaPenalty} => ${value}`);
+    }
+  }
+
+  if (key === "EDU") {
+    const improved = applyEduImprovementsDetailed(value, age);
+    value = improved.value;
+    if (improved.steps.length > 0) {
+      steps.push(...improved.steps);
+    }
+  }
+
+  return {
+    key,
+    base,
+    finalValue: value,
+    steps,
   };
 }
 
@@ -562,7 +710,10 @@ export function validateSkillAllocation(
 }
 
 function hasAllCharacteristics(draft: CharacterDraft): draft is CharacterDraft & { characteristics: Characteristics } {
-  return characteristicKeys.every((key) => typeof draft.characteristics[key] === "number");
+  return characteristicKeys.every((key) => {
+    const value = draft.characteristics[key];
+    return typeof value === "number" && Number.isFinite(value);
+  });
 }
 
 export function validateStep(stepId: number, draft: CharacterDraft): ValidationIssue[] {
@@ -578,6 +729,9 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
       });
     }
 
+  }
+
+  if (stepId >= 2) {
     if (!hasAllCharacteristics(draft)) {
       issues.push({
         code: "MISSING_CHARACTERISTICS",
@@ -602,7 +756,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 2) {
+  if (stepId >= 3) {
     if (!draft.occupation) {
       issues.push({
         code: "MISSING_OCCUPATION",
@@ -656,7 +810,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 3 && hasAllCharacteristics(draft) && draft.occupation) {
+  if (stepId >= 4 && hasAllCharacteristics(draft) && draft.occupation) {
     const occupationDef = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
     if (occupationDef) {
       const occupationPoints = evaluateOccupationPointsFormula(
@@ -689,7 +843,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 4) {
+  if (stepId >= 5) {
     const backgroundFields = [
       draft.background.descripcionPersonal,
       draft.background.ideologiaCreencias,
@@ -720,7 +874,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 5) {
+  if (stepId >= 6) {
     if (!draft.equipment.spendingLevel || draft.equipment.spendingLevel.trim().length === 0) {
       issues.push({
         code: "MISSING_SPENDING_LEVEL",
@@ -759,7 +913,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
 }
 
 export function finalizeCharacter(draft: CharacterDraft): CharacterSheet {
-  const issues = validateStep(5, draft).filter((issue) => issue.severity === "error");
+  const issues = validateStep(6, draft).filter((issue) => issue.severity === "error");
   if (issues.length > 0) {
     throw new Error(`No se puede finalizar: ${issues.map((i) => i.message).join(" | ")}`);
   }

@@ -83,7 +83,7 @@
         {"min": 365, "max": 444, "damage_bonus": "+4D6", "build": 5},
         {"min": 445, "max": 524, "damage_bonus": "+5D6", "build": 6}
       ],
-      "overflow_rule": "Por cada +80 puntos (o fraccion) por encima de 524: +1D6 de dano y +1 Build."
+      "overflow_rule": "Por cada +80 puntos (o fraccion) por encima de 524: +1D6 de dano y +1 a la Corpulencia."
     }
   },
   "skill_point_rules": {

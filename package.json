@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:poll": "WATCHPACK_POLLING=true next dev",
     "dev:clean": "rm -rf .next && next dev",
     "build": "next build",
     "build:clean": "rm -rf .next && next build",
