@@ -602,27 +602,6 @@ export function Wizard({ step }: { step: number }) {
         <h1 className="title">Creador de Investigadores</h1>
         <p className="subtitle">{title}</p>
 
-        <div className="step-nav" aria-label="Pasos">
-          {stepsCatalog.steps.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              className={`step-pill ${item.id === step ? "active" : ""}`}
-              onClick={() => router.push(`/crear/${item.id}`)}
-            >
-              {item.id}. {item.title}
-            </button>
-          ))}
-          <button
-            type="button"
-            className={`step-pill ${step === stepsCatalog.steps.length + 1 ? "active" : ""}`}
-            onClick={() => router.push("/crear/resumen")}
-          >
-            {stepsCatalog.steps.length + 1}. Resumen
-          </button>
-        </div>
-        <p className="small step-nav-hint">Desliza la barra de pasos para ver todos los pasos.</p>
-
         <Issues issues={issues} />
 
         {step === 1 && (
