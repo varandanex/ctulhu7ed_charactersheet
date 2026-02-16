@@ -420,7 +420,6 @@ export function Wizard({ step }: { step: number }) {
   const {
     draft,
     setAge,
-    setEra,
     setAgePenaltyAllocation,
     setLastRolledAge,
     incrementGuardianRerollRequests,
@@ -442,7 +441,7 @@ export function Wizard({ step }: { step: number }) {
 
   const occupation = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
   const occupationCreditRange = occupation ? parseCreditRange(occupation.credit_range) : null;
-  const selectedEra = draft.era ?? "clasica";
+  const selectedEra = "actual";
   const allOccupations = useMemo(() => {
     if (selectedEra === "actual") return professionCatalog.occupations;
     return professionCatalog.occupations.filter((item) => !item.tags.includes("actual"));
@@ -1699,22 +1698,11 @@ export function Wizard({ step }: { step: number }) {
             <div className="card">
               <p className="kpi">Ambientacion</p>
               <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className={selectedEra === "clasica" ? "primary" : "ghost"}
-                  onClick={() => setEra("clasica")}
-                >
-                  Clasica / Lovecraftiana
-                </button>
-                <button
-                  type="button"
-                  className={selectedEra === "actual" ? "primary" : "ghost"}
-                  onClick={() => setEra("actual")}
-                >
-                  Actual
-                </button>
+                <span className="primary" style={{ display: "inline-flex", alignItems: "center", padding: "0.65rem 1rem" }}>
+                  Era fija: actual
+                </span>
               </div>
-              <p className="small">La era Actual habilita tambien ocupaciones modernas como Pirata informatico.</p>
+              <p className="small">Se usa siempre la ambientacion actual para habilitar todas las ocupaciones disponibles.</p>
             </div>
             {activeOccupation && (
               <div

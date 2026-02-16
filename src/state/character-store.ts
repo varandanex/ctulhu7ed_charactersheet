@@ -32,8 +32,8 @@ function normalizeCharacteristicValue(value: unknown): number | undefined {
 }
 
 function normalizeEra(era: string | undefined): string {
-  if (era === "clasica" || era === "actual") return era;
-  return "clasica";
+  if (era === "actual") return era;
+  return "actual";
 }
 
 const emptyDraft: CharacterDraft = {
@@ -41,7 +41,7 @@ const emptyDraft: CharacterDraft = {
   age: 25,
   lastRolledAge: undefined,
   guardianRerollRequests: 0,
-  era: "clasica",
+  era: "actual",
   agePenaltyAllocation: defaultAgePenaltyAllocation,
   characteristics: {},
   occupation: undefined,
@@ -103,7 +103,7 @@ export const useCharacterStore = create<CharacterStore>()(
     (set) => ({
       draft: emptyDraft,
       setAge: (age) => set((state) => ({ draft: { ...state.draft, age } })),
-      setEra: (era) => set((state) => ({ draft: { ...state.draft, era: normalizeEra(era) } })),
+      setEra: (_) => set((state) => ({ draft: { ...state.draft, era: "actual" } })),
       setAgePenaltyAllocation: (allocation) =>
         set((state) => ({
           draft: {
