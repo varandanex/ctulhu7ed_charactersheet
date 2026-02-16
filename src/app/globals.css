@@ -516,6 +516,13 @@ button:disabled {
   color: #edf5f1;
 }
 
+.roll-summary-derived-detail {
+  margin: 7px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: #99afaa;
+}
+
 .roll-summary-interest-card {
   margin-top: 2px;
   border: 1px solid #314042;
@@ -1404,7 +1411,7 @@ input[type="range"]#age-slider::-moz-range-thumb {
   border-top: 1px solid var(--border);
   border-radius: 16px 16px 0 0;
   background: linear-gradient(145deg, rgba(20, 26, 28, 0.97), rgba(15, 20, 21, 0.97));
-  padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+  padding: 48px 14px calc(14px + env(safe-area-inset-bottom));
   display: grid;
   gap: 12px;
 }
@@ -1458,13 +1465,15 @@ input[type="range"]#age-slider::-moz-range-thumb {
   border-radius: 14px;
   background: linear-gradient(145deg, rgba(20, 26, 28, 0.98), rgba(15, 20, 21, 0.98));
   padding: 16px;
+  padding-top: 48px;
 }
 
 .skill-help-title-row {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   gap: 12px;
+  padding-right: 44px;
 }
 
 .skill-help-title-row h3 {
@@ -1473,6 +1482,9 @@ input[type="range"]#age-slider::-moz-range-thumb {
 }
 
 .skill-help-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
   width: 34px;
   min-width: 34px;
   height: 34px;
@@ -1480,6 +1492,11 @@ input[type="range"]#age-slider::-moz-range-thumb {
   border-radius: 999px;
   border: 1px solid #4f6668;
   font-weight: 700;
+}
+
+.mobile-points-close {
+  top: 8px;
+  right: 8px;
 }
 
 .skill-help-sheet p {
@@ -1504,7 +1521,7 @@ input[type="range"]#age-slider::-moz-range-thumb {
 }
 
 .guardian-arcane-eye {
-  margin: -4px 0 10px;
+  margin: 8px 0 10px;
   padding: 6px 8px 2px;
   border-radius: 10px;
   border: 1px solid rgba(116, 30, 30, 0.45);

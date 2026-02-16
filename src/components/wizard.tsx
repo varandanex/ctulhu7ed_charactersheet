@@ -988,7 +988,7 @@ export function Wizard({ step }: { step: number }) {
   const currentRerollAttempt = (draft.guardianRerollRequests ?? 0) + (showGuardianPermissionModal ? 1 : 0);
   const guardianCosmicWarning =
     currentRerollAttempt >= CTHULHU_ANGER_THRESHOLD
-      ? "Cthulhu ya se va a cabrear de verdad: una relanzada mas y te pone a tirar cordura en directo."
+      ? "Una relanzada más, y Cthulhu no te hará tirar Cordura; te arrancará la mente antes de que toques los dados"
       : currentRerollAttempt >= COSMIC_REROLL_WARNING_THRESHOLD
         ? "El Ojo Cosmico de Loverfatcraft ya sospecha trampa. Vale una vez... pero ya vas por la segunda relanzada."
         : undefined;
@@ -1245,20 +1245,6 @@ export function Wizard({ step }: { step: number }) {
                   : "Ve lanzando una por una y observa como van quedando los valores."}
               </p>
             </div>
-            {allCharacteristicsRolled && !isSummaryRerollFlow && (
-              <div className="card" style={{ gridColumn: "1 / -1" }}>
-                <p className="kpi">Derivados previos:</p>
-                {(() => {
-                  const derived = computeDerivedStats(draft.characteristics as any, draft.age);
-                  return (
-                    <p>
-                      PV {derived.pv} | PM {derived.pmInicial} | MOV {derived.mov} | BD {derived.damageBonus} | Corpulencia{" "}
-                      {derived.build}
-                    </p>
-                  );
-                })()}
-              </div>
-            )}
           </div>
         )}
 
@@ -1314,7 +1300,15 @@ export function Wizard({ step }: { step: number }) {
               <div className="card roll-summary-derived">
                 <p className="kpi">Calculos derivados</p>
                 {(() => {
-                  const derived = computeDerivedStats(draft.characteristics as any, draft.age);
+                  const characteristics = draft.characteristics as any;
+                  const derived = computeDerivedStats(characteristics, draft.age);
+                  const movBase = characteristics.DES < characteristics.TAM && characteristics.FUE < characteristics.TAM
+                    ? 7
+                    : characteristics.DES > characteristics.TAM && characteristics.FUE > characteristics.TAM
+                      ? 9
+                      : 8;
+                  const movPenalty = draft.age >= 40 ? Math.min(5, Math.floor(draft.age / 10) - 3) : 0;
+                  const sumFueTam = characteristics.FUE + characteristics.TAM;
                   return (
                     <div className="roll-summary-derived-grid">
                       <div className="roll-summary-derived-item">
@@ -1322,17 +1316,22 @@ export function Wizard({ step }: { step: number }) {
                         <p className="roll-summary-derived-value">
                           <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.pv}</span>
                         </p>
+                        <p className="roll-summary-derived-detail">floor(({characteristics.CON} + {characteristics.TAM}) / 10)</p>
                       </div>
                       <div className="roll-summary-derived-item">
                         <p className="roll-summary-derived-label">PM</p>
                         <p className="roll-summary-derived-value">
                           <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.pmInicial}</span>
                         </p>
+                        <p className="roll-summary-derived-detail">floor({characteristics.POD} / 5)</p>
                       </div>
                       <div className="roll-summary-derived-item">
                         <p className="roll-summary-derived-label">MOV</p>
                         <p className="roll-summary-derived-value">
                           <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.mov}</span>
+                        </p>
+                        <p className="roll-summary-derived-detail">
+                          Base {movBase} - penalizador edad {movPenalty} = {derived.mov}
                         </p>
                       </div>
                       <div className="roll-summary-derived-item">
@@ -1340,12 +1339,14 @@ export function Wizard({ step }: { step: number }) {
                         <p className="roll-summary-derived-value">
                           <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.damageBonus}</span>
                         </p>
+                        <p className="roll-summary-derived-detail">Tabla por suma FUE + TAM ({sumFueTam})</p>
                       </div>
                       <div className="roll-summary-derived-item">
                         <p className="roll-summary-derived-label">Corpulencia</p>
                         <p className="roll-summary-derived-value">
                           <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.build}</span>
                         </p>
+                        <p className="roll-summary-derived-detail">Tabla por suma FUE + TAM ({sumFueTam})</p>
                       </div>
                     </div>
                   );
@@ -1355,6 +1356,7 @@ export function Wizard({ step }: { step: number }) {
                   <p className="roll-summary-derived-value">
                     <span className="roll-summary-value-badge roll-summary-value-badge--derived">{personalPoints}</span>
                   </p>
+                  <p className="roll-summary-derived-detail">INT ({draft.characteristics.INT}) x 2</p>
                 </div>
               </div>
             ) : (
@@ -1699,6 +1701,9 @@ export function Wizard({ step }: { step: number }) {
               <div className="mobile-points-modal" role="dialog" aria-modal="true" aria-label="Detalle de puntos">
                 <div className="mobile-points-overlay" onClick={() => setMobilePointsOpen(false)} />
                 <div className="mobile-points-sheet">
+                  <button type="button" className="skill-help-close mobile-points-close" onClick={() => setMobilePointsOpen(false)} aria-label="Cerrar detalle de puntos">
+                    x
+                  </button>
                   <div className="card points-card">
                     <p className="kpi">Puntos de ocupacion</p>
                     <p>Total: {occupationPoints}</p>
