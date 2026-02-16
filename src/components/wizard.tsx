@@ -74,6 +74,15 @@ const customSkillBaseOptions = [
   "Otras lenguas",
   "Pilotar",
 ];
+const customSkillInlineHints: Record<string, string> = {
+  "Armas de fuego": "Ej: Subfusil, Fusil/Escopeta, Ametralladora...",
+  "Arte/Artesania": "Ej: Fotografia, Pintura, Ceramica...",
+  Ciencia: "Ej: Quimica, Astronomia, Biologia...",
+  Combatir: "Ej: Pelea, Espada, Lanza...",
+  "Lengua propia": "Ej: Espanol (idioma nativo del personaje)",
+  "Otras lenguas": "Ej: Latin, Frances, Nahuatl...",
+  Pilotar: "Ej: Aeronave, Barco, Helicoptero...",
+};
 
 function parseCreditRange(range: string): { min: number; max: number } {
   const [min, max] = range.split("-").map((n) => Number(n.trim()));
@@ -165,6 +174,11 @@ function buildCustomSkillName(base: string, detail: string): string {
   const cleanDetail = detail.trim();
   if (!cleanDetail) return cleanBase;
   return `${cleanBase} (${cleanDetail})`;
+}
+
+function isCustomSkillBase(skill: string): boolean {
+  const normalized = normalizeSkillName(skill);
+  return customSkillBaseOptions.some((option) => normalizeSkillName(option) === normalized);
 }
 
 function buildSkillOrderIndexMap(skills: string[]): Map<string, number> {
@@ -401,6 +415,7 @@ export function Wizard({ step }: { step: number }) {
   const [customSkillDetail, setCustomSkillDetail] = useState<string>("");
   const [customSkillBucket, setCustomSkillBucket] = useState<"occupation" | "personal">("personal");
   const [customSkillMessage, setCustomSkillMessage] = useState<string>("");
+  const [customInlineDetails, setCustomInlineDetails] = useState<Record<string, string>>({});
   const [rollingCharacteristic, setRollingCharacteristic] = useState<CharacteristicKey | null>(null);
   const [recentlyRolledCharacteristic, setRecentlyRolledCharacteristic] = useState<CharacteristicKey | null>(null);
   const [rollingPreviewValue, setRollingPreviewValue] = useState<number | null>(null);
@@ -465,6 +480,7 @@ export function Wizard({ step }: { step: number }) {
     const unique = new Set([...investigatorSkillsCatalog.skills, ...occupationSkills, ...assignedSkills]);
     return [...unique];
   }, [draft.skills.occupation, draft.skills.personal, occupationSkills]);
+  const normalizedPersonalSkills = useMemo(() => new Set(personalSkills.map((skill) => normalizeSkillName(skill))), [personalSkills]);
   const groupedSkills = useMemo(() => {
     const fallback = ["Mitos de Cthulhu", "Psicologia", "Descubrir", "Buscar libros"];
     const allSkills = personalSkills.length > 0 ? personalSkills : fallback;
@@ -810,39 +826,64 @@ export function Wizard({ step }: { step: number }) {
     return computedSkills[skill]?.base ?? 0;
   }
 
-  function handleAddCustomSkill() {
-    const candidate = buildCustomSkillName(customSkillBase, customSkillDetail);
+  function addCustomSkill(base: string, detail: string, bucket: "occupation" | "personal"): { ok: boolean; candidate: string } {
+    const candidate = buildCustomSkillName(base, detail);
     const normalizedCandidate = normalizeSkillName(candidate);
     if (!normalizedCandidate) {
       setCustomSkillMessage("Escribe una especialidad valida.");
-      return;
+      return { ok: false, candidate };
     }
 
-    const exists = [...personalSkills].some((skill) => normalizeSkillName(skill) === normalizedCandidate);
+    const exists = normalizedPersonalSkills.has(normalizedCandidate);
     if (exists) {
       setCustomSkillMessage(`${candidate} ya existe en la lista.`);
-      return;
+      return { ok: false, candidate };
     }
 
     if (!normalizedCatalogSkills.has(normalizedCandidate)) {
       setCustomSkillMessage(`${candidate} no aparece en el libro basico cargado.`);
-      return;
+      return { ok: false, candidate };
     }
 
-    if (customSkillBucket === "occupation" && !isAllowedOccupationSkill(draft.occupation, candidate)) {
+    if (bucket === "occupation" && !isAllowedOccupationSkill(draft.occupation, candidate)) {
       setCustomSkillMessage(`${candidate} no esta habilitada para tu ocupacion actual.`);
-      return;
+      return { ok: false, candidate };
     }
 
     if (isForbiddenInitialCreationSkill(candidate)) {
-      const bucketLabel = customSkillBucket === "occupation" ? "ocupacion" : "interes";
+      const bucketLabel = bucket === "occupation" ? "ocupacion" : "interes";
       setCustomSkillMessage(`${candidate} no puede recibir puntos de ${bucketLabel} al crear personaje.`);
-      return;
+      return { ok: false, candidate };
     }
 
-    setSkill(customSkillBucket, candidate, 0);
-    setCustomSkillDetail("");
+    setSkill(bucket, candidate, 0);
     setCustomSkillMessage(`Habilidad agregada: ${candidate}`);
+    return { ok: true, candidate };
+  }
+
+  function handleAddCustomSkill() {
+    const result = addCustomSkill(customSkillBase, customSkillDetail, customSkillBucket);
+    if (result.ok) {
+      setCustomSkillDetail("");
+    }
+  }
+
+  function handleInlineCustomSkillChange(base: string, value: string) {
+    setCustomInlineDetails((current) => ({
+      ...current,
+      [base]: value,
+    }));
+  }
+
+  function handleAddInlineCustomSkill(base: string, bucket: "occupation" | "personal") {
+    const detail = customInlineDetails[base] ?? "";
+    const result = addCustomSkill(base, detail, bucket);
+    if (!result.ok) return;
+    setCustomInlineDetails((current) => {
+      const next = { ...current };
+      delete next[base];
+      return next;
+    });
   }
 
   function setChoiceGroupSkills(groupIndex: number, groupLabel: string, selectedValues: string[], count: number) {
@@ -2077,7 +2118,7 @@ export function Wizard({ step }: { step: number }) {
                     <input
                       type="text"
                       value={customSkillDetail}
-                      placeholder="Ej: Subfusil, Quimica, Espanol, Helicoptero..."
+                      placeholder={customSkillInlineHints[customSkillBase] ?? "Ej: Subfusil, Quimica, Espanol, Helicoptero..."}
                       onChange={(event) => setCustomSkillDetail(event.target.value)}
                     />
                   </div>
@@ -2117,6 +2158,15 @@ export function Wizard({ step }: { step: number }) {
                   const personalMin = 0;
                   const personalMax = isCredit ? 0 : getSkillMax("personal", skill);
                   const personalValue = isCredit ? 0 : (draft.skills.personal[skill] ?? 0);
+                  const isCustomBaseSkill = isCustomSkillBase(skill);
+                  const inlineDetail = customInlineDetails[skill] ?? "";
+                  const inlineCandidate = buildCustomSkillName(skill, inlineDetail);
+                  const normalizedInlineCandidate = normalizeSkillName(inlineCandidate);
+                  const inlineExists = normalizedPersonalSkills.has(normalizedInlineCandidate);
+                  const inlineInCatalog = normalizedCatalogSkills.has(normalizedInlineCandidate);
+                  const inlineForbidden = isForbiddenInitialCreationSkill(inlineCandidate);
+                  const inlineCanAssignOccupation = isAllowedOccupationSkill(draft.occupation, inlineCandidate);
+                  const hasInlineDetail = inlineDetail.trim().length > 0;
 
                   return (
                     <div className="card" key={skill}>
@@ -2149,6 +2199,47 @@ export function Wizard({ step }: { step: number }) {
                           </div>
                         </div>
                       </div>
+                      {isCustomBaseSkill && (
+                        <div className="skill-inline-add">
+                          <p className="skill-inline-add-title">Agregar especialidad de {skill}</p>
+                          <div className="grid two skill-inline-add-grid">
+                            <div>
+                              <input
+                                type="text"
+                                value={inlineDetail}
+                                placeholder={customSkillInlineHints[skill] ?? "Especialidad"}
+                                onChange={(event) => handleInlineCustomSkillChange(skill, event.target.value)}
+                              />
+                            </div>
+                            <div className="skill-inline-add-actions">
+                              <button
+                                type="button"
+                                className="skill-inline-add-btn"
+                                onClick={() => handleAddInlineCustomSkill(skill, "personal")}
+                                disabled={!inlineInCatalog || inlineExists || inlineForbidden}
+                              >
+                                + Interes
+                              </button>
+                              <button
+                                type="button"
+                                className="skill-inline-add-btn"
+                                onClick={() => handleAddInlineCustomSkill(skill, "occupation")}
+                                disabled={!inlineInCatalog || inlineExists || inlineForbidden || !inlineCanAssignOccupation}
+                              >
+                                + Ocupacion
+                              </button>
+                            </div>
+                          </div>
+                          {!inlineInCatalog && <p className="small">Esa especialidad no existe en el catalogo cargado.</p>}
+                          {inlineExists && <p className="small">Esa habilidad ya existe en la lista.</p>}
+                          {hasInlineDetail && inlineForbidden && (
+                            <p className="small">No puede recibir puntos durante la creacion de personaje.</p>
+                          )}
+                          {hasInlineDetail && !inlineCanAssignOccupation && (
+                            <p className="small">No habilitada para tu ocupacion actual.</p>
+                          )}
+                        </div>
+                      )}
                       <div className="grid three">
                         <div>
                           <label>Base</label>
@@ -2243,6 +2334,15 @@ export function Wizard({ step }: { step: number }) {
                   const personalMin = 0;
                   const personalMax = getSkillMax("personal", skill);
                   const personalValue = draft.skills.personal[skill] ?? 0;
+                  const isCustomBaseSkill = isCustomSkillBase(skill);
+                  const inlineDetail = customInlineDetails[skill] ?? "";
+                  const inlineCandidate = buildCustomSkillName(skill, inlineDetail);
+                  const normalizedInlineCandidate = normalizeSkillName(inlineCandidate);
+                  const inlineExists = normalizedPersonalSkills.has(normalizedInlineCandidate);
+                  const inlineInCatalog = normalizedCatalogSkills.has(normalizedInlineCandidate);
+                  const inlineForbidden = isForbiddenInitialCreationSkill(inlineCandidate);
+                  const inlineCanAssignOccupation = isAllowedOccupationSkill(draft.occupation, inlineCandidate);
+                  const hasInlineDetail = inlineDetail.trim().length > 0;
 
                   return (
                     <div className="card" key={skill}>
@@ -2275,6 +2375,47 @@ export function Wizard({ step }: { step: number }) {
                           </div>
                         </div>
                       </div>
+                      {isCustomBaseSkill && (
+                        <div className="skill-inline-add">
+                          <p className="skill-inline-add-title">Agregar especialidad de {skill}</p>
+                          <div className="grid two skill-inline-add-grid">
+                            <div>
+                              <input
+                                type="text"
+                                value={inlineDetail}
+                                placeholder={customSkillInlineHints[skill] ?? "Especialidad"}
+                                onChange={(event) => handleInlineCustomSkillChange(skill, event.target.value)}
+                              />
+                            </div>
+                            <div className="skill-inline-add-actions">
+                              <button
+                                type="button"
+                                className="skill-inline-add-btn"
+                                onClick={() => handleAddInlineCustomSkill(skill, "personal")}
+                                disabled={!inlineInCatalog || inlineExists || inlineForbidden}
+                              >
+                                + Interes
+                              </button>
+                              <button
+                                type="button"
+                                className="skill-inline-add-btn"
+                                onClick={() => handleAddInlineCustomSkill(skill, "occupation")}
+                                disabled={!inlineInCatalog || inlineExists || inlineForbidden || !inlineCanAssignOccupation}
+                              >
+                                + Ocupacion
+                              </button>
+                            </div>
+                          </div>
+                          {!inlineInCatalog && <p className="small">Esa especialidad no existe en el catalogo cargado.</p>}
+                          {inlineExists && <p className="small">Esa habilidad ya existe en la lista.</p>}
+                          {hasInlineDetail && inlineForbidden && (
+                            <p className="small">No puede recibir puntos durante la creacion de personaje.</p>
+                          )}
+                          {hasInlineDetail && !inlineCanAssignOccupation && (
+                            <p className="small">No habilitada para tu ocupacion actual.</p>
+                          )}
+                        </div>
+                      )}
                       <div className="grid three">
                         <div>
                           <label>Base</label>

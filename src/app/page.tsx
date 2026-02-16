@@ -6,6 +6,9 @@ import { ResetProgressModal } from "@/components/reset-progress-modal";
 import { clearClientData, hasStoredProgress } from "@/lib/client-data";
 
 export default function HomePage() {
+  const shareUrl = "https://callofcthulhu-charactersheet.vercel.app";
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(shareUrl)}`;
+
   const router = useRouter();
   const [showResetModal, setShowResetModal] = useState(false);
 
@@ -35,6 +38,15 @@ export default function HomePage() {
             <button className="primary" type="button" onClick={handleStart}>
               Empezar creacion
             </button>
+          </div>
+          <div className="home-share" aria-label="Compartir aplicacion con codigo QR">
+            <img className="home-share-qr" src={qrUrl} alt="Codigo QR para compartir la app" />
+            <div className="home-share-copy">
+              <p className="home-share-title">Compartir app</p>
+              <a className="home-share-link" href={shareUrl} target="_blank" rel="noreferrer">
+                {shareUrl}
+              </a>
+            </div>
           </div>
         </div>
         <figure className="home-cover" aria-label="Ilustracion de dado para la portada">

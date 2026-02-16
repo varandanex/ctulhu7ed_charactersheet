@@ -163,6 +163,53 @@ main {
   min-width: 190px;
 }
 
+.home-share {
+  margin-top: 12px;
+  border: 1px solid #3a4a4c;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(24, 33, 35, 0.95), rgba(18, 25, 26, 0.95));
+  padding: 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.home-share-qr {
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  border: 1px solid #425557;
+  background: #fff;
+  display: block;
+}
+
+.home-share-copy {
+  min-width: 0;
+}
+
+.home-share-title {
+  margin: 0 0 4px;
+  font-size: 0.86rem;
+  color: #b5c8c3;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.home-share-link {
+  display: block;
+  color: #d7ebe4;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+
+.home-share-link:hover {
+  color: #f2fff9;
+}
+
 .home-cover {
   margin: 0;
   border-radius: 14px;
@@ -177,6 +224,18 @@ main {
   display: block;
   object-fit: cover;
   object-position: center;
+}
+
+@media (max-width: 540px) {
+  .home-share {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .home-share-link {
+    text-align: center;
+  }
 }
 
 .grid {
@@ -1553,6 +1612,39 @@ input[type="range"]#age-slider::-moz-range-thumb {
   font-size: 1.55rem;
   line-height: 1;
   color: #e9fff6;
+}
+
+.skill-inline-add {
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid rgba(94, 133, 126, 0.55);
+  border-radius: 12px;
+  background: linear-gradient(165deg, rgba(22, 37, 35, 0.78), rgba(17, 28, 29, 0.86));
+}
+
+.skill-inline-add-title {
+  margin: 0 0 8px;
+  font-size: 0.84rem;
+  color: #b6ccc6;
+}
+
+.skill-inline-add-grid {
+  gap: 8px;
+}
+
+.skill-inline-add-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.skill-inline-add-btn {
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid #486462;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #223635, #1a2929);
+  font-size: 0.84rem;
 }
 
 .skill-thresholds {
