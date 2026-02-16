@@ -779,7 +779,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 3) {
+  if (stepId >= 4) {
     if (!draft.occupation) {
       issues.push({
         code: "MISSING_OCCUPATION",
@@ -833,7 +833,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 4 && hasAllCharacteristics(draft) && draft.occupation) {
+  if (stepId >= 5 && hasAllCharacteristics(draft) && draft.occupation) {
     const occupationDef = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
     if (occupationDef) {
       const occupationPoints = evaluateOccupationPointsFormula(
@@ -866,7 +866,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 5) {
+  if (stepId >= 6) {
     const backgroundFields = [
       draft.background.descripcionPersonal,
       draft.background.ideologiaCreencias,
@@ -897,7 +897,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 6) {
+  if (stepId >= 7) {
     if (!draft.equipment.spendingLevel || draft.equipment.spendingLevel.trim().length === 0) {
       issues.push({
         code: "MISSING_SPENDING_LEVEL",
@@ -936,7 +936,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
 }
 
 export function finalizeCharacter(draft: CharacterDraft): CharacterSheet {
-  const issues = validateStep(6, draft).filter((issue) => issue.severity === "error");
+  const issues = validateStep(7, draft).filter((issue) => issue.severity === "error");
   if (issues.length > 0) {
     throw new Error(`No se puede finalizar: ${issues.map((i) => i.message).join(" | ")}`);
   }

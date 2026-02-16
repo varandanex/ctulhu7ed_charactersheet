@@ -88,6 +88,7 @@ export interface CharacterDraft {
   mode: "random";
   age: number;
   lastRolledAge?: number;
+  guardianRerollRequests?: number;
   era?: string;
   agePenaltyAllocation: AgePenaltyAllocation;
   characteristics: Partial<Characteristics>;

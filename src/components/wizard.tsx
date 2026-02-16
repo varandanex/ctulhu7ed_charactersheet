@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type TouchEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { investigatorSkillsCatalog, professionCatalog, rulesCatalog, stepsCatalog } from "@/rules-data/catalog";
 import { getSkillHelp } from "@/rules-data/skill-help";
@@ -44,6 +44,8 @@ const AGE_MIN = 15;
 const AGE_MAX = 89;
 const AGE_MARKS = [20, 40, 60, 80];
 const INITIAL_ROLL_ANIMATION_MS = 500;
+const COSMIC_REROLL_WARNING_THRESHOLD = 2;
+const CTHULHU_ANGER_THRESHOLD = 3;
 const DICE_FACE_VALUES = {
   front: 1,
   back: 6,
@@ -298,8 +300,14 @@ function Issues({ issues }: { issues: ValidationIssue[] }) {
 
 export function Wizard({ step }: { step: number }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showResetModal, setShowResetModal] = useState(false);
   const [showResetRollsModal, setShowResetRollsModal] = useState(false);
+  const [showGuardianPermissionModal, setShowGuardianPermissionModal] = useState(false);
+  const [pendingRerollCharacteristic, setPendingRerollCharacteristic] = useState<CharacteristicKey | null>(null);
+  const [rerollingCharacteristic, setRerollingCharacteristic] = useState<CharacteristicKey | null>(null);
+  const [summaryRerollCompleted, setSummaryRerollCompleted] = useState(false);
+  const [summaryHighlightCharacteristics, setSummaryHighlightCharacteristics] = useState<CharacteristicKey[]>([]);
   const [mobilePointsOpen, setMobilePointsOpen] = useState(false);
   const [helpSkillOpen, setHelpSkillOpen] = useState<string | null>(null);
   const [rollingCharacteristic, setRollingCharacteristic] = useState<CharacteristicKey | null>(null);
@@ -313,6 +321,7 @@ export function Wizard({ step }: { step: number }) {
   const [occupationImageOrientation, setOccupationImageOrientation] = useState<Record<string, "portrait" | "landscape">>({});
   const launchTimeoutRef = useRef<number | null>(null);
   const rollPreviewIntervalRef = useRef<number | null>(null);
+  const summaryHighlightTimeoutsRef = useRef<Partial<Record<CharacteristicKey, number>>>({});
   const occupationTouchStartX = useRef<number | null>(null);
   const occupationTouchStartY = useRef<number | null>(null);
   const occupationTouchCurrentX = useRef<number | null>(null);
@@ -322,6 +331,8 @@ export function Wizard({ step }: { step: number }) {
     setAge,
     setAgePenaltyAllocation,
     setLastRolledAge,
+    incrementGuardianRerollRequests,
+    resetGuardianRerollRequests,
     clearCharacteristics,
     setCharacteristic,
     setOccupation,
@@ -425,6 +436,20 @@ export function Wizard({ step }: { step: number }) {
   const youthState = getTargetState(youthCurrent, youthTarget);
   const matureState = getTargetState(matureCurrent, matureTarget);
   const eduImprovementRolls = getEduImprovementRolls(draft.age);
+  const rerollFromSummary = searchParams.get("reroll");
+  const rerollReturnStep = Number(searchParams.get("return") ?? "3");
+  const highlightFromSummary = searchParams.get("highlight");
+  const rerollCharacteristicFromSummary = characteristicKeys.includes(rerollFromSummary as CharacteristicKey)
+    ? (rerollFromSummary as CharacteristicKey)
+    : null;
+  const highlightCharacteristicFromSummary = characteristicKeys.includes(highlightFromSummary as CharacteristicKey)
+    ? (highlightFromSummary as CharacteristicKey)
+    : null;
+  const shouldAutoRerollFromSummary = step === 2 && rerollCharacteristicFromSummary !== null;
+  const isSummaryRerollFlow = shouldAutoRerollFromSummary;
+  const isSummaryRerollInProgress = shouldAutoRerollFromSummary && !summaryRerollCompleted;
+  const summaryRerollReturnStep =
+    Number.isFinite(rerollReturnStep) && rerollReturnStep >= 1 && rerollReturnStep <= 7 ? rerollReturnStep : 3;
 
   const canContinue = issues.every((issue) => issue.severity !== "error");
   const activeDiceCount = rollingCharacteristic
@@ -559,6 +584,30 @@ export function Wizard({ step }: { step: number }) {
     setShowResetRollsModal(true);
   }
 
+  function handleAskGuardianPermissionForReroll(key: CharacteristicKey) {
+    setPendingRerollCharacteristic(key);
+    setShowGuardianPermissionModal(true);
+  }
+
+  function handleConfirmGuardianReroll() {
+    if (!pendingRerollCharacteristic || rerollingCharacteristic) return;
+    const key = pendingRerollCharacteristic;
+    router.push(`/crear/2?reroll=${key}&return=3`);
+    setRerollingCharacteristic(key);
+    incrementGuardianRerollRequests();
+    setShowGuardianPermissionModal(false);
+    setPendingRerollCharacteristic(null);
+  }
+
+  function handleReturnAfterSummaryReroll() {
+    if (!rerollCharacteristicFromSummary || !summaryRerollCompleted) return;
+    router.push(
+      summaryRerollReturnStep === 3
+        ? `/crear/${summaryRerollReturnStep}?highlight=${rerollCharacteristicFromSummary}`
+        : `/crear/${summaryRerollReturnStep}`,
+    );
+  }
+
   function handleConfirmResetCharacteristicRolls() {
     if (launchTimeoutRef.current !== null) {
       window.clearTimeout(launchTimeoutRef.current);
@@ -573,6 +622,7 @@ export function Wizard({ step }: { step: number }) {
     setDiceValues([]);
     setRollingCharacteristic(null);
     setCharacteristicRollDetails({});
+    resetGuardianRerollRequests();
     clearCharacteristics();
     setShowResetRollsModal(false);
   }
@@ -654,7 +704,7 @@ export function Wizard({ step }: { step: number }) {
 
   function goNext() {
     if (!canContinue) return;
-    if (step >= 6) {
+    if (step >= 7) {
       router.push("/crear/resumen");
       return;
     }
@@ -680,8 +730,93 @@ export function Wizard({ step }: { step: number }) {
       if (rollPreviewIntervalRef.current !== null) {
         window.clearInterval(rollPreviewIntervalRef.current);
       }
+      Object.values(summaryHighlightTimeoutsRef.current).forEach((timeoutId) => {
+        if (typeof timeoutId === "number") {
+          window.clearTimeout(timeoutId);
+        }
+      });
     };
   }, []);
+
+  useEffect(() => {
+    if (!shouldAutoRerollFromSummary) return;
+    setSummaryRerollCompleted(false);
+  }, [rerollCharacteristicFromSummary, shouldAutoRerollFromSummary]);
+
+  useEffect(() => {
+    if (
+      !shouldAutoRerollFromSummary ||
+      !rerollCharacteristicFromSummary ||
+      summaryRerollCompleted ||
+      rollingCharacteristic ||
+      rerollingCharacteristic
+    )
+      return;
+    const characteristicToRoll = rerollCharacteristicFromSummary;
+    const diceCount = getCharacteristicDiceCount(characteristicToRoll);
+
+    setRerollingCharacteristic(characteristicToRoll);
+    setRecentlyRolledCharacteristic(null);
+    setRollingCharacteristic(characteristicToRoll);
+    setRollingPreviewValue(Math.floor(Math.random() * 99) + 1);
+    setDiceValues(Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
+
+    if (rollPreviewIntervalRef.current !== null) {
+      window.clearInterval(rollPreviewIntervalRef.current);
+    }
+    rollPreviewIntervalRef.current = window.setInterval(() => {
+      setRollingPreviewValue(Math.floor(Math.random() * 99) + 1);
+      setDiceValues(Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
+    }, 72);
+
+    if (launchTimeoutRef.current !== null) {
+      window.clearTimeout(launchTimeoutRef.current);
+    }
+    launchTimeoutRef.current = window.setTimeout(() => {
+      const detail = rollCharacteristicWithAgeModifiersDetailed(characteristicToRoll, draft.age, agePenaltyAllocation);
+      setCharacteristic(characteristicToRoll, detail.finalValue);
+      const rolledDice = extractRolledDiceFromStep(detail.steps[0] ?? "");
+      setDiceValues(rolledDice.length > 0 ? rolledDice : Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
+      setCharacteristicRollDetails((current) => ({
+        ...current,
+        [characteristicToRoll]: detail.steps,
+      }));
+      if (rollPreviewIntervalRef.current !== null) {
+        window.clearInterval(rollPreviewIntervalRef.current);
+        rollPreviewIntervalRef.current = null;
+      }
+      launchTimeoutRef.current = null;
+      setRecentlyRolledCharacteristic(characteristicToRoll);
+      setRollingPreviewValue(null);
+      setRollingCharacteristic(null);
+      setRerollingCharacteristic(null);
+      setSummaryRerollCompleted(true);
+    }, INITIAL_ROLL_ANIMATION_MS);
+  }, [
+    agePenaltyAllocation,
+    draft.age,
+    rerollCharacteristicFromSummary,
+    summaryRerollCompleted,
+    rerollingCharacteristic,
+    rollingCharacteristic,
+    setCharacteristic,
+    shouldAutoRerollFromSummary,
+  ]);
+
+  useEffect(() => {
+    if (step !== 3 || !highlightCharacteristicFromSummary) return;
+    const characteristic = highlightCharacteristicFromSummary;
+    setSummaryHighlightCharacteristics((current) => (current.includes(characteristic) ? current : [...current, characteristic]));
+    const currentTimeout = summaryHighlightTimeoutsRef.current[characteristic];
+    if (typeof currentTimeout === "number") {
+      window.clearTimeout(currentTimeout);
+    }
+    summaryHighlightTimeoutsRef.current[characteristic] = window.setTimeout(() => {
+      setSummaryHighlightCharacteristics((current) => current.filter((item) => item !== characteristic));
+      delete summaryHighlightTimeoutsRef.current[characteristic];
+    }, 3000);
+    router.replace("/crear/3");
+  }, [highlightCharacteristicFromSummary, router, step]);
 
   useEffect(() => {
     if (!helpSkillOpen) return;
@@ -702,7 +837,7 @@ export function Wizard({ step }: { step: number }) {
   }, [helpSkillOpen]);
 
   useEffect(() => {
-    if (step !== 3) return;
+    if (step !== 4) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       const element = document.activeElement as HTMLElement | null;
@@ -729,7 +864,7 @@ export function Wizard({ step }: { step: number }) {
   }, [step, goToNextOccupation, goToPreviousOccupation]);
 
   useEffect(() => {
-    if (step !== 3 || !draft.occupation?.name) return;
+    if (step !== 4 || !draft.occupation?.name) return;
     const selectedIndex = allOccupations.findIndex((item) => item.name === draft.occupation?.name);
     if (selectedIndex >= 0) {
       setOccupationSlideIndex(selectedIndex);
@@ -737,7 +872,7 @@ export function Wizard({ step }: { step: number }) {
   }, [allOccupations, draft.occupation?.name, step]);
 
   useEffect(() => {
-    if (step !== 3 || !draft.occupation) return;
+    if (step !== 4 || !draft.occupation) return;
     const selectedOccupation = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
     if (!selectedOccupation) return;
     const requiredFormulaChoiceCount = extractOccupationFormulaChoiceGroups(selectedOccupation.occupation_points_formula).length;
@@ -849,6 +984,14 @@ export function Wizard({ step }: { step: number }) {
     setShowResetModal(false);
     router.push("/");
   }
+
+  const currentRerollAttempt = (draft.guardianRerollRequests ?? 0) + (showGuardianPermissionModal ? 1 : 0);
+  const guardianCosmicWarning =
+    currentRerollAttempt >= CTHULHU_ANGER_THRESHOLD
+      ? "Cthulhu ya se va a cabrear de verdad: una relanzada mas y te pone a tirar cordura en directo."
+      : currentRerollAttempt >= COSMIC_REROLL_WARNING_THRESHOLD
+        ? "El Ojo Cosmico de Loverfatcraft ya sospecha trampa. Vale una vez... pero ya vas por la segunda relanzada."
+        : undefined;
 
   return (
     <main>
@@ -973,7 +1116,6 @@ export function Wizard({ step }: { step: number }) {
         {step === 2 && (
           <div className="grid two">
             <div className="card roll-substeps-card" style={{ gridColumn: "1 / -1" }}>
-              <p className="kpi">Subpaso 2.1: Tiradas de caracteristicas</p>
               <p className="roll-next-step">
                 {currentCharacteristicInRoll
                   ? `Habilidad en curso: ${currentCharacteristicInRoll}`
@@ -1056,35 +1198,54 @@ export function Wizard({ step }: { step: number }) {
                 )}
               </div>
               <div className="roll-substeps-actions">
-                {!isFirstRollPending && (
+                {shouldAutoRerollFromSummary ? (
                   <button
-                    className={`primary ${rollingCharacteristic ? "rolling" : ""}`}
+                    className="primary"
                     type="button"
-                    onClick={handlePrepareNextCharacteristic}
-                    disabled={!nextCharacteristicToRoll || Boolean(rollingCharacteristic)}
+                    onClick={handleReturnAfterSummaryReroll}
+                    disabled={!summaryRerollCompleted || Boolean(rollingCharacteristic)}
                   >
-                    {nextCharacteristicToRoll ? `Siguiente característica (${nextCharacteristicToRoll})` : "Sin pendientes"}
+                    {summaryRerollCompleted ? "Volver al resumen" : "Relanzando..."}
                   </button>
+                ) : (
+                  <>
+                    {!isFirstRollPending && (
+                      <button
+                        className={`primary ${rollingCharacteristic ? "rolling" : ""}`}
+                        type="button"
+                        onClick={handlePrepareNextCharacteristic}
+                        disabled={!nextCharacteristicToRoll || Boolean(rollingCharacteristic)}
+                      >
+                        {nextCharacteristicToRoll ? `Siguiente característica (${nextCharacteristicToRoll})` : "Sin pendientes"}
+                      </button>
+                    )}
+                    <button
+                      className="primary"
+                      type="button"
+                      onClick={isFirstRollPending ? handleLaunchNextCharacteristic : handleLaunchPreparedCharacteristic}
+                      disabled={isFirstRollPending ? !nextCharacteristicToRoll : !rollingCharacteristic}
+                    >
+                      {isFirstRollPending
+                        ? `Lanzar ${nextCharacteristicToRoll ?? "característica"}`
+                        : rollingCharacteristic
+                          ? `Lanzar ${rollingCharacteristic}`
+                          : "Lanzar característica"}
+                    </button>
+                    <button className="ghost" type="button" onClick={handleResetCharacteristicRolls}>
+                      Reiniciar tiradas
+                    </button>
+                  </>
                 )}
-                <button
-                  className="primary"
-                  type="button"
-                  onClick={isFirstRollPending ? handleLaunchNextCharacteristic : handleLaunchPreparedCharacteristic}
-                  disabled={isFirstRollPending ? !nextCharacteristicToRoll : !rollingCharacteristic}
-                >
-                  {isFirstRollPending
-                    ? `Lanzar ${nextCharacteristicToRoll ?? "característica"}`
-                    : rollingCharacteristic
-                      ? `Lanzar ${rollingCharacteristic}`
-                      : "Lanzar característica"}
-                </button>
-                <button className="ghost" type="button" onClick={handleResetCharacteristicRolls}>
-                  Reiniciar tiradas
-                </button>
               </div>
-              <p className="small">Ve lanzando una por una y observa como van quedando los valores.</p>
+              <p className="small">
+                {shouldAutoRerollFromSummary
+                  ? summaryRerollCompleted
+                    ? "Resultado aplicado. Pulsa para volver al resumen."
+                    : "Relanzando característica con animación..."
+                  : "Ve lanzando una por una y observa como van quedando los valores."}
+              </p>
             </div>
-            {allCharacteristicsRolled && (
+            {allCharacteristicsRolled && !isSummaryRerollFlow && (
               <div className="card" style={{ gridColumn: "1 / -1" }}>
                 <p className="kpi">Derivados previos:</p>
                 {(() => {
@@ -1102,6 +1263,110 @@ export function Wizard({ step }: { step: number }) {
         )}
 
         {step === 3 && (
+          <div className="roll-summary-layout">
+            <div className="card roll-summary-hero">
+              <p className="kpi">Resultado de tiradas hasta ahora</p>
+              <p className="small">Revisa atributos, formula aplicada y derivados antes de pasar a ocupacion.</p>
+              <div className="roll-summary-hero-metrics">
+                <span className="roll-summary-meta">Edad: {draft.age}</span>
+                <span className="roll-summary-meta">Atributos listos: {completedCharacteristicCount}/9</span>
+                <span className={`roll-summary-meta ${allCharacteristicsRolled ? "done" : ""}`}>
+                  {allCharacteristicsRolled ? "Listo para ocupacion" : "Faltan tiradas"}
+                </span>
+              </div>
+            </div>
+
+            <div className="roll-summary-stats">
+              {characteristicKeys.map((key) => (
+                <div
+                  className={`card roll-summary-card ${typeof draft.characteristics[key] === "number" ? "filled" : ""} ${summaryHighlightCharacteristics.includes(key) ? "reroll-highlight" : ""}`}
+                  key={`summary-roll-${key}`}
+                >
+                  <div className="roll-summary-card-head">
+                    <p className="kpi roll-summary-label">{key}</p>
+                  </div>
+                  <p className="roll-summary-value">
+                    <span className={`roll-summary-value-badge ${typeof draft.characteristics[key] === "number" ? "" : "is-empty"}`}>
+                      {draft.characteristics[key] ?? "--"}
+                    </span>
+                  </p>
+                  <p className="roll-summary-formula">Tirada: {getCharacteristicRollSource(key)}</p>
+                  <div className="roll-summary-card-actions">
+                    <button
+                      type="button"
+                      className="ghost roll-summary-reroll-button"
+                      onClick={() => handleAskGuardianPermissionForReroll(key)}
+                      disabled={typeof draft.characteristics[key] !== "number" || rerollingCharacteristic === key}
+                    >
+                      {rerollingCharacteristic === key ? "Relanzando..." : "Relanzar"}
+                    </button>
+                  </div>
+                {characteristicRollDetails[key]?.length ? (
+                    <details className="roll-summary-detail">
+                      <summary>Ver detalle</summary>
+                      <p className="small">{characteristicRollDetails[key]?.join(" | ")}</p>
+                    </details>
+                ) : null}
+                </div>
+              ))}
+            </div>
+            {allCharacteristicsRolled ? (
+              <div className="card roll-summary-derived">
+                <p className="kpi">Calculos derivados</p>
+                {(() => {
+                  const derived = computeDerivedStats(draft.characteristics as any, draft.age);
+                  return (
+                    <div className="roll-summary-derived-grid">
+                      <div className="roll-summary-derived-item">
+                        <p className="roll-summary-derived-label">PV</p>
+                        <p className="roll-summary-derived-value">
+                          <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.pv}</span>
+                        </p>
+                      </div>
+                      <div className="roll-summary-derived-item">
+                        <p className="roll-summary-derived-label">PM</p>
+                        <p className="roll-summary-derived-value">
+                          <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.pmInicial}</span>
+                        </p>
+                      </div>
+                      <div className="roll-summary-derived-item">
+                        <p className="roll-summary-derived-label">MOV</p>
+                        <p className="roll-summary-derived-value">
+                          <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.mov}</span>
+                        </p>
+                      </div>
+                      <div className="roll-summary-derived-item">
+                        <p className="roll-summary-derived-label">BD</p>
+                        <p className="roll-summary-derived-value">
+                          <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.damageBonus}</span>
+                        </p>
+                      </div>
+                      <div className="roll-summary-derived-item">
+                        <p className="roll-summary-derived-label">Corpulencia</p>
+                        <p className="roll-summary-derived-value">
+                          <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.build}</span>
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div className="roll-summary-interest-card">
+                  <p className="roll-summary-derived-label">Puntos de interes base (INT x2)</p>
+                  <p className="roll-summary-derived-value">
+                    <span className="roll-summary-value-badge roll-summary-value-badge--derived">{personalPoints}</span>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="card roll-summary-derived">
+                <p className="kpi">Calculos derivados</p>
+                <p className="small">Completa las tiradas restantes para ver PV, PM, MOV, BD y Corpulencia.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {step === 4 && (
           <div className="grid">
             {activeOccupation && (
               <div
@@ -1318,7 +1583,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <div className="skills-layout">
             <aside className="points-sidebar">
               <div className="card points-card">
@@ -1477,7 +1742,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 5 && (
+        {step === 6 && (
           <div className="grid two">
             <div className="card" style={{ gridColumn: "1 / -1" }}>
               <p className="kpi">Trasfondo</p>
@@ -1601,7 +1866,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 6 && (
+        {step === 7 && (
           <div className="grid">
             <div className="card">
               <p className="kpi">Finanzas (segun Credito)</p>
@@ -1643,23 +1908,30 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        <div className="actions">
-          <button className="ghost" type="button" onClick={goBack}>
-            Atras
-          </button>
-          <button className="primary" type="button" onClick={goNext} disabled={!canContinue}>
-            {step >= 6 ? "Ir al resumen" : "Siguiente"}
-          </button>
-          <button
-            className="ghost"
-            type="button"
-            onClick={() => setShowResetModal(true)}
-          >
-            Reiniciar
-          </button>
-        </div>
+        {!isSummaryRerollFlow && (
+          <div className="actions">
+            <button className="ghost" type="button" onClick={goBack}>
+              Atras
+            </button>
+            <button className="primary" type="button" onClick={goNext} disabled={!canContinue}>
+              {step >= 7 ? "Ir al resumen" : "Siguiente"}
+            </button>
+            <button
+              className="ghost"
+              type="button"
+              onClick={() => setShowResetModal(true)}
+            >
+              Reiniciar
+            </button>
+          </div>
+        )}
       </section>
-      <ResetProgressModal open={showResetModal} onCancel={() => setShowResetModal(false)} onConfirm={handleConfirmReset} />
+      <ResetProgressModal
+        open={showResetModal}
+        onCancel={() => setShowResetModal(false)}
+        onConfirm={handleConfirmReset}
+        showArcaneEye
+      />
       <ResetProgressModal
         open={showResetRollsModal}
         onCancel={() => setShowResetRollsModal(false)}
@@ -1668,6 +1940,22 @@ export function Wizard({ step }: { step: number }) {
         message="¿Estás seguro de reiniciar tiradas? Las tiradas anteriores se perderán."
         confirmLabel="Sí, reiniciar tiradas"
         ariaLabel="Confirmar reinicio de tiradas"
+        showArcaneEye
+      />
+      <ResetProgressModal
+        open={showGuardianPermissionModal}
+        onCancel={() => {
+          setShowGuardianPermissionModal(false);
+          setPendingRerollCharacteristic(null);
+        }}
+        onConfirm={handleConfirmGuardianReroll}
+        title="Permiso del guardian"
+        message={`Para volver a relanzar${pendingRerollCharacteristic ? ` ${pendingRerollCharacteristic}` : " esta caracteristica"} debes tener el permiso del guardian.`}
+        secondaryMessage={guardianCosmicWarning}
+        confirmLabel="Tengo el permiso"
+        cancelLabel="Cancelar"
+        ariaLabel="Confirmar permiso del guardian para relanzar caracteristica"
+        showArcaneEye
       />
     </main>
   );
@@ -1748,7 +2036,7 @@ export function Summary() {
         )}
 
         <div className="actions">
-          <button className="ghost" type="button" onClick={() => router.push("/crear/6")}>
+          <button className="ghost" type="button" onClick={() => router.push("/crear/7")}>
             Volver a editar
           </button>
           <button
@@ -1760,7 +2048,12 @@ export function Summary() {
           </button>
         </div>
       </section>
-      <ResetProgressModal open={showResetModal} onCancel={() => setShowResetModal(false)} onConfirm={handleConfirmReset} />
+      <ResetProgressModal
+        open={showResetModal}
+        onCancel={() => setShowResetModal(false)}
+        onConfirm={handleConfirmReset}
+        showArcaneEye
+      />
     </main>
   );
 }

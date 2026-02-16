@@ -40,6 +40,7 @@ const emptyDraft: CharacterDraft = {
   mode: "random",
   age: 25,
   lastRolledAge: undefined,
+  guardianRerollRequests: 0,
   era: "clasica",
   agePenaltyAllocation: defaultAgePenaltyAllocation,
   characteristics: {},
@@ -81,6 +82,8 @@ interface CharacterStore {
   setAgePenaltyAllocation: (allocation: Partial<AgePenaltyAllocation>) => void;
   rollAllCharacteristics: () => void;
   setLastRolledAge: (age: number | undefined) => void;
+  incrementGuardianRerollRequests: () => void;
+  resetGuardianRerollRequests: () => void;
   clearCharacteristics: () => void;
   setCharacteristics: (characteristics: Partial<Characteristics>) => void;
   setCharacteristic: (key: CharacteristicKey, value: number) => void;
@@ -131,11 +134,26 @@ export const useCharacterStore = create<CharacterStore>()(
             lastRolledAge: age,
           },
         })),
+      incrementGuardianRerollRequests: () =>
+        set((state) => ({
+          draft: {
+            ...state.draft,
+            guardianRerollRequests: (state.draft.guardianRerollRequests ?? 0) + 1,
+          },
+        })),
+      resetGuardianRerollRequests: () =>
+        set((state) => ({
+          draft: {
+            ...state.draft,
+            guardianRerollRequests: 0,
+          },
+        })),
       clearCharacteristics: () =>
         set((state) => ({
           draft: {
             ...state.draft,
             lastRolledAge: undefined,
+            guardianRerollRequests: 0,
             characteristics: {},
           },
         })),

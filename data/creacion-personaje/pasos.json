@@ -15,24 +15,30 @@
     },
     {
       "id": 3,
+      "key": "resumen_tiradas",
+      "title": "Revisar resultados",
+      "description": "Revisar tiradas, modificadores por edad y calculos derivados antes de elegir ocupacion."
+    },
+    {
+      "id": 4,
       "key": "determinar_ocupacion",
       "title": "Determinar ocupacion",
       "description": "Elegir profesion, rango de Credito y conjunto de habilidades de ocupacion."
     },
     {
-      "id": 4,
+      "id": 5,
       "key": "habilidades",
       "title": "Elegir habilidades y distribuir puntos",
       "description": "Asignar puntos de ocupacion y puntos de interes particular (INT x2)."
     },
     {
-      "id": 5,
+      "id": 6,
       "key": "trasfondo",
       "title": "Crear trasfondo",
       "description": "Definir historia personal, motivaciones, allegados, rasgos y elementos clave del personaje."
     },
     {
-      "id": 6,
+      "id": 7,
       "key": "equipo",
       "title": "Equipar investigador",
       "description": "Determinar dinero/propiedades y anotar equipo, armas y objetos relevantes."
