@@ -27,18 +27,24 @@
     },
     {
       "id": 5,
-      "key": "habilidades",
-      "title": "Elegir habilidades y distribuir puntos",
-      "description": "Asignar puntos de ocupacion y puntos de interes particular (INT x2)."
+      "key": "seleccion_habilidades_ocupacion",
+      "title": "Elegir habilidades de ocupacion",
+      "description": "Configurar Credito, opciones de ocupacion y formula antes de asignar puntos."
     },
     {
       "id": 6,
+      "key": "habilidades",
+      "title": "Distribuir puntos de habilidades",
+      "description": "Asignar puntos de ocupacion y puntos de interes particular (INT x2)."
+    },
+    {
+      "id": 7,
       "key": "trasfondo",
       "title": "Crear trasfondo",
       "description": "Definir historia personal, motivaciones, allegados, rasgos y elementos clave del personaje."
     },
     {
-      "id": 7,
+      "id": 8,
       "key": "equipo",
       "title": "Equipar investigador",
       "description": "Determinar dinero/propiedades y anotar equipo, armas y objetos relevantes."

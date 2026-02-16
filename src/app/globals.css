@@ -1298,6 +1298,125 @@ input[type="range"]#age-slider::-moz-range-thumb {
   justify-content: flex-end;
 }
 
+.occupation-skill-badges {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.occupation-skill-group + .occupation-skill-group {
+  margin-top: 10px;
+}
+
+.occupation-choice-summary {
+  margin-top: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #2d474a;
+  border-radius: 12px;
+  background: rgba(13, 28, 31, 0.42);
+  position: sticky;
+  top: 14px;
+}
+
+.occupation-choice-summary-group + .occupation-choice-summary-group {
+  margin-top: 10px;
+}
+
+.occupation-choice-layout {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.occupation-choice-main {
+  min-width: 0;
+}
+
+.occupation-choice-group {
+  margin-bottom: 12px;
+}
+
+.occupation-choice-options {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.occupation-choice-option {
+  border: 1px solid #365557;
+  background: rgba(26, 43, 46, 0.52);
+  color: #c8d9da;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.occupation-choice-option:hover {
+  border-color: #6fa28f;
+  background: rgba(42, 75, 67, 0.45);
+  color: #e1f5ef;
+  transform: translateY(-1px);
+}
+
+.occupation-choice-option.is-selected {
+  border-color: #8ee0c5;
+  background: linear-gradient(180deg, rgba(75, 145, 121, 0.3), rgba(36, 74, 63, 0.35));
+  color: #ddf7ef;
+  animation: occupation-chip-pop 180ms ease-out;
+}
+
+.occupation-choice-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.occupation-skill-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #365557;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.occupation-skill-badge.is-selected {
+  border-color: #8ee0c5;
+  background: linear-gradient(180deg, rgba(75, 145, 121, 0.28), rgba(36, 74, 63, 0.32));
+  color: #ddf7ef;
+  animation: occupation-chip-pop 180ms ease-out;
+}
+
+.occupation-skill-badge.is-available {
+  background: rgba(35, 55, 58, 0.38);
+  color: #c5d7d8;
+}
+
+.occupation-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: rgba(132, 219, 189, 0.2);
+  border: 1px solid rgba(142, 224, 197, 0.7);
+  color: #dff9f1;
+  font-size: 0.75rem;
+  line-height: 1;
+  font-weight: 700;
+}
+
 .skills-layout {
   display: grid;
   gap: 16px;
@@ -1646,6 +1765,18 @@ input[type="range"]#age-slider::-moz-range-thumb {
   }
 }
 
+@keyframes occupation-chip-pop {
+  0% {
+    transform: scale(0.96);
+  }
+  70% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @keyframes card-roll-shake {
   from {
     transform: translateX(-1px);
@@ -1838,6 +1969,15 @@ pre.json {
 }
 
 @media (max-width: 880px) {
+  .occupation-choice-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .occupation-choice-summary {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
   .occupation-visual.portrait {
     width: min(100%, 340px);
   }

@@ -806,7 +806,14 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
             severity: "error",
           });
         }
+      }
+    }
+  }
 
+  if (stepId >= 5) {
+    if (draft.occupation) {
+      const occupation = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
+      if (occupation) {
         const choiceSelectionErrors = validateChoiceSelections(draft.occupation);
         for (const message of choiceSelectionErrors) {
           issues.push({
@@ -833,7 +840,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 5 && hasAllCharacteristics(draft) && draft.occupation) {
+  if (stepId >= 6 && hasAllCharacteristics(draft) && draft.occupation) {
     const occupationDef = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
     if (occupationDef) {
       const occupationPoints = evaluateOccupationPointsFormula(
@@ -866,7 +873,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 6) {
+  if (stepId >= 7) {
     const backgroundFields = [
       draft.background.descripcionPersonal,
       draft.background.ideologiaCreencias,
@@ -897,7 +904,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 7) {
+  if (stepId >= 8) {
     if (!draft.equipment.spendingLevel || draft.equipment.spendingLevel.trim().length === 0) {
       issues.push({
         code: "MISSING_SPENDING_LEVEL",
@@ -936,7 +943,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
 }
 
 export function finalizeCharacter(draft: CharacterDraft): CharacterSheet {
-  const issues = validateStep(7, draft).filter((issue) => issue.severity === "error");
+  const issues = validateStep(8, draft).filter((issue) => issue.severity === "error");
   if (issues.length > 0) {
     throw new Error(`No se puede finalizar: ${issues.map((i) => i.message).join(" | ")}`);
   }

@@ -28,10 +28,13 @@ Aplicacion web para facilitar la creacion de hojas de personaje de La Llamada de
 - `npm run test:e2e`: pruebas E2E
 
 ## Flujo
-1. `/crear/1` Caracteristicas
-2. `/crear/2` Ocupacion
-3. `/crear/3` Habilidades
-4. `/crear/4` Trasfondo
-5. `/crear/5` Equipo
-6. `/crear/resumen` Exportaciones JSON/PDF
+1. `/crear/1` Determinar edad
+2. `/crear/2` Generar caracteristicas
+3. `/crear/3` Revisar resultados
+4. `/crear/4` Determinar ocupacion
+5. `/crear/5` Elegir habilidades de ocupacion
+6. `/crear/6` Distribuir puntos de habilidades
+7. `/crear/7` Crear trasfondo
+8. `/crear/8` Equipar investigador
+9. `/crear/resumen` Exportaciones JSON/PDF
 # ctulhu7ed_charactersheet

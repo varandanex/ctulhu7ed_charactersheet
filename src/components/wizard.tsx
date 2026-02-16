@@ -449,7 +449,7 @@ export function Wizard({ step }: { step: number }) {
   const isSummaryRerollFlow = shouldAutoRerollFromSummary;
   const isSummaryRerollInProgress = shouldAutoRerollFromSummary && !summaryRerollCompleted;
   const summaryRerollReturnStep =
-    Number.isFinite(rerollReturnStep) && rerollReturnStep >= 1 && rerollReturnStep <= 7 ? rerollReturnStep : 3;
+    Number.isFinite(rerollReturnStep) && rerollReturnStep >= 1 && rerollReturnStep <= 8 ? rerollReturnStep : 3;
 
   const canContinue = issues.every((issue) => issue.severity !== "error");
   const activeDiceCount = rollingCharacteristic
@@ -704,7 +704,7 @@ export function Wizard({ step }: { step: number }) {
 
   function goNext() {
     if (!canContinue) return;
-    if (step >= 7) {
+    if (step >= 8) {
       router.push("/crear/resumen");
       return;
     }
@@ -907,6 +907,10 @@ export function Wizard({ step }: { step: number }) {
   function applyOccupationBySlide(index: number) {
     const selected = allOccupations[index];
     if (!selected) return;
+    const isCurrentSelection = draft.occupation?.name === selected.name;
+    const preservedCredit = isCurrentSelection ? draft.occupation?.creditRating : undefined;
+    const preservedChoices = isCurrentSelection ? draft.occupation?.selectedChoices : undefined;
+    const preservedFormulaChoices = isCurrentSelection ? draft.occupation?.formulaChoices : undefined;
     const selectedChoices = buildDefaultChoiceSelections(selected.name);
     const formulaChoices = extractOccupationFormulaChoiceGroups(selected.occupation_points_formula).reduce(
       (acc, group) => {
@@ -915,19 +919,24 @@ export function Wizard({ step }: { step: number }) {
       },
       {} as Record<string, string>,
     );
+    const finalChoices = preservedChoices && Object.keys(preservedChoices).length > 0 ? preservedChoices : selectedChoices;
+    const finalFormulaChoices =
+      preservedFormulaChoices && Object.keys(preservedFormulaChoices).length > 0 ? preservedFormulaChoices : formulaChoices;
+    const creditRating = preservedCredit ?? Number(selected.credit_range.split("-")[0]);
     const selectedSkills = collectAllowedOccupationSkills({
       name: selected.name,
-      creditRating: Number(selected.credit_range.split("-")[0]),
+      creditRating,
       selectedSkills: [],
-      selectedChoices,
+      selectedChoices: finalChoices,
     });
     setOccupation({
       name: selected.name,
-      creditRating: Number(selected.credit_range.split("-")[0]),
-      selectedChoices,
+      creditRating,
+      selectedChoices: finalChoices,
       selectedSkills,
-      formulaChoices,
+      formulaChoices: finalFormulaChoices,
     });
+    router.push("/crear/5");
   }
 
   function goToPreviousOccupation() {
@@ -1255,7 +1264,9 @@ export function Wizard({ step }: { step: number }) {
               <p className="small">Revisa atributos, formula aplicada y derivados antes de pasar a ocupacion.</p>
               <div className="roll-summary-hero-metrics">
                 <span className="roll-summary-meta">Edad: {draft.age}</span>
-                <span className="roll-summary-meta">Atributos listos: {completedCharacteristicCount}/9</span>
+                <span className="roll-summary-meta">
+                  Caracteristicas listas: {completedCharacteristicCount}/{characteristicKeys.length}
+                </span>
                 <span className={`roll-summary-meta ${allCharacteristicsRolled ? "done" : ""}`}>
                   {allCharacteristicsRolled ? "Listo para ocupacion" : "Faltan tiradas"}
                 </span>
@@ -1298,7 +1309,7 @@ export function Wizard({ step }: { step: number }) {
             </div>
             {allCharacteristicsRolled ? (
               <div className="card roll-summary-derived">
-                <p className="kpi">Calculos derivados</p>
+                <p className="kpi">Cálculos automáticos</p>
                 {(() => {
                   const characteristics = draft.characteristics as any;
                   const derived = computeDerivedStats(characteristics, draft.age);
@@ -1316,14 +1327,18 @@ export function Wizard({ step }: { step: number }) {
                         <p className="roll-summary-derived-value">
                           <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.pv}</span>
                         </p>
-                        <p className="roll-summary-derived-detail">floor(({characteristics.CON} + {characteristics.TAM}) / 10)</p>
+                        <p className="roll-summary-derived-detail">
+                          ({characteristics.CON} + {characteristics.TAM}) / 10, redondeado hacia abajo
+                        </p>
                       </div>
                       <div className="roll-summary-derived-item">
                         <p className="roll-summary-derived-label">PM</p>
                         <p className="roll-summary-derived-value">
                           <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.pmInicial}</span>
                         </p>
-                        <p className="roll-summary-derived-detail">floor({characteristics.POD} / 5)</p>
+                        <p className="roll-summary-derived-detail">
+                          {characteristics.POD} / 5, redondeado hacia abajo
+                        </p>
                       </div>
                       <div className="roll-summary-derived-item">
                         <p className="roll-summary-derived-label">MOV</p>
@@ -1339,20 +1354,24 @@ export function Wizard({ step }: { step: number }) {
                         <p className="roll-summary-derived-value">
                           <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.damageBonus}</span>
                         </p>
-                        <p className="roll-summary-derived-detail">Tabla por suma FUE + TAM ({sumFueTam})</p>
+                        <p className="roll-summary-derived-detail">
+                          Se toma de la tabla usando FUE + TAM = {sumFueTam}
+                        </p>
                       </div>
                       <div className="roll-summary-derived-item">
                         <p className="roll-summary-derived-label">Corpulencia</p>
                         <p className="roll-summary-derived-value">
                           <span className="roll-summary-value-badge roll-summary-value-badge--derived">{derived.build}</span>
                         </p>
-                        <p className="roll-summary-derived-detail">Tabla por suma FUE + TAM ({sumFueTam})</p>
+                        <p className="roll-summary-derived-detail">
+                          Se toma de la tabla usando FUE + TAM = {sumFueTam}
+                        </p>
                       </div>
                     </div>
                   );
                 })()}
                 <div className="roll-summary-interest-card">
-                  <p className="roll-summary-derived-label">Puntos de interes base (INT x2)</p>
+                  <p className="roll-summary-derived-label">Puntos de interés base (INT x2)</p>
                   <p className="roll-summary-derived-value">
                     <span className="roll-summary-value-badge roll-summary-value-badge--derived">{personalPoints}</span>
                   </p>
@@ -1361,7 +1380,7 @@ export function Wizard({ step }: { step: number }) {
               </div>
             ) : (
               <div className="card roll-summary-derived">
-                <p className="kpi">Calculos derivados</p>
+                <p className="kpi">Cálculos automáticos</p>
                 <p className="small">Completa las tiradas restantes para ver PV, PM, MOV, BD y Corpulencia.</p>
               </div>
             )}
@@ -1455,10 +1474,6 @@ export function Wizard({ step }: { step: number }) {
                         <p className="kpi">Formula de puntos</p>
                         <p>{activeOccupation.occupation_points_formula}</p>
                       </div>
-                      <div className="card">
-                        <p className="kpi">Etiqueta</p>
-                        <p>{activeOccupation.tags.length > 0 ? activeOccupation.tags.join(", ") : "General"}</p>
-                      </div>
                     </div>
 
                     <div className="occupation-columns">
@@ -1486,42 +1501,6 @@ export function Wizard({ step }: { step: number }) {
                       </div>
                     </div>
 
-                    {draft.occupation?.name === activeOccupation.name && activeOccupation.choice_groups.length > 0 && (
-                      <div className="card">
-                        <p className="kpi">Seleccion de opciones de ocupacion</p>
-                        {activeOccupation.choice_groups.map((group, index) => {
-                          const key = getChoiceKey(index, group.label);
-                          const options = getChoiceGroupSkillOptions(index, activeOccupation.name);
-                          const selectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
-                          return (
-                            <div key={key} style={{ marginBottom: 12 }}>
-                              <label>
-                                {group.label} (elige {group.count})
-                              </label>
-                              <select
-                                multiple
-                                size={Math.min(8, Math.max(4, options.length))}
-                                value={selectedValues}
-                                onChange={(event) => {
-                                  const values = Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
-                                  setChoiceGroupSkills(index, group.label, values, group.count);
-                                }}
-                              >
-                                {options.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                              <p className="small">
-                                Seleccionadas: {selectedValues.length} / {group.count}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
                     <div className="occupation-carousel-actions">
                       <button type="button" className="primary" onClick={() => applyOccupationBySlide(occupationSlideIndex)}>
                         Elegir {activeOccupation.name}
@@ -1532,6 +1511,11 @@ export function Wizard({ step }: { step: number }) {
               </div>
             )}
 
+          </div>
+        )}
+
+        {step === 5 && (
+          <div className="grid">
             {draft.occupation && occupation && (
               <div className="grid two">
                 <div className="card">
@@ -1551,8 +1535,110 @@ export function Wizard({ step }: { step: number }) {
                 </div>
                 <div className="card">
                   <p className="kpi">Habilidades disponibles de ocupacion seleccionada</p>
-                  <p>{occupationSkills.join(", ") || "Sin listado"}</p>
+                  {occupationSkills.length > 0 ? (
+                    <>
+                      <div className="occupation-skill-group">
+                        <p className="small">Seleccionadas</p>
+                        <div className="occupation-skill-badges">
+                          {occupationSkills
+                            .filter((skill) => draft.occupation?.selectedSkills?.includes(skill))
+                            .map((skill) => (
+                              <span key={`selected-${skill}`} className="occupation-skill-badge is-selected">
+                                {skill}
+                              </span>
+                            ))}
+                        </div>
+                      </div>
+                      <div className="occupation-skill-group">
+                        <p className="small">Disponibles</p>
+                        <div className="occupation-skill-badges">
+                          {occupationSkills
+                            .filter((skill) => !(draft.occupation?.selectedSkills?.includes(skill) ?? false))
+                            .map((skill) => (
+                              <span key={`available-${skill}`} className="occupation-skill-badge is-available">
+                                {skill}
+                              </span>
+                            ))}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="small">Sin listado</p>
+                  )}
                 </div>
+                {occupation.choice_groups.length > 0 && (
+                  <div className="card" style={{ gridColumn: "1 / -1" }}>
+                    <p className="kpi">Seleccion de opciones de ocupacion</p>
+                    <div className="occupation-choice-layout">
+                      <div className="occupation-choice-main">
+                        {occupation.choice_groups.map((group, index) => {
+                          const key = getChoiceKey(index, group.label);
+                          const options = getChoiceGroupSkillOptions(index, occupation.name);
+                          const selectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
+                          return (
+                            <div key={key} className="occupation-choice-group">
+                              <label>
+                                {group.label} (elige {group.count})
+                              </label>
+                              <div className="occupation-choice-options">
+                                {options.map((option) => {
+                                  const isSelected = selectedValues.includes(option);
+                                  const canSelectMore = selectedValues.length < group.count;
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={option}
+                                      className={`occupation-choice-option ${isSelected ? "is-selected" : ""}`}
+                                      disabled={!isSelected && !canSelectMore}
+                                      onClick={() => {
+                                        const nextValues = isSelected
+                                          ? selectedValues.filter((value) => value !== option)
+                                          : [...selectedValues, option];
+                                        setChoiceGroupSkills(index, group.label, nextValues, group.count);
+                                      }}
+                                    >
+                                      {isSelected && <span className="occupation-check" aria-hidden="true">✓</span>}
+                                      {option}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <p className="small">
+                                Seleccionadas: {selectedValues.length} / {group.count}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <aside className="occupation-choice-summary">
+                        <p className="kpi">Especialidades elegidas</p>
+                        {occupation.choice_groups.map((group, index) => {
+                          const key = getChoiceKey(index, group.label);
+                          const selectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
+                          return (
+                            <div key={`summary-${key}`} className="occupation-choice-summary-group">
+                              <p className="small">
+                                {group.label} ({selectedValues.length}/{group.count})
+                              </p>
+                              <div className="occupation-skill-badges">
+                                {selectedValues.length > 0 ? (
+                                  selectedValues.map((skill) => (
+                                    <span key={`summary-badge-${key}-${skill}`} className="occupation-skill-badge is-selected">
+                                      <span className="occupation-check" aria-hidden="true">✓</span>
+                                      {skill}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="occupation-skill-badge is-available">Sin seleccionar</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </aside>
+                    </div>
+                  </div>
+                )}
                 {occupationFormulaChoices.length > 0 && (
                   <div className="card" style={{ gridColumn: "1 / -1" }}>
                     <p className="kpi">Eleccion de formula de puntos</p>
@@ -1585,7 +1671,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 5 && (
+        {step === 6 && (
           <div className="skills-layout">
             <aside className="points-sidebar">
               <div className="card points-card">
@@ -1747,7 +1833,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 6 && (
+        {step === 7 && (
           <div className="grid two">
             <div className="card" style={{ gridColumn: "1 / -1" }}>
               <p className="kpi">Trasfondo</p>
@@ -1871,7 +1957,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 7 && (
+        {step === 8 && (
           <div className="grid">
             <div className="card">
               <p className="kpi">Finanzas (segun Credito)</p>
@@ -1919,7 +2005,7 @@ export function Wizard({ step }: { step: number }) {
               Atras
             </button>
             <button className="primary" type="button" onClick={goNext} disabled={!canContinue}>
-              {step >= 7 ? "Ir al resumen" : "Siguiente"}
+              {step >= 8 ? "Ir al resumen" : "Siguiente"}
             </button>
             <button
               className="ghost"
@@ -2041,7 +2127,7 @@ export function Summary() {
         )}
 
         <div className="actions">
-          <button className="ghost" type="button" onClick={() => router.push("/crear/7")}>
+          <button className="ghost" type="button" onClick={() => router.push("/crear/8")}>
             Volver a editar
           </button>
           <button
