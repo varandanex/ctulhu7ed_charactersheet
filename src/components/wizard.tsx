@@ -38,6 +38,9 @@ const defaultAgePenaltyAllocation = {
   matureConPenalty: 1,
   matureDesPenalty: 3,
 };
+const AGE_MIN = 15;
+const AGE_MAX = 89;
+const AGE_MARKS = [20, 40, 60, 80];
 
 function parseCreditRange(range: string): { min: number; max: number } {
   const [min, max] = range.split("-").map((n) => Number(n.trim()));
@@ -273,6 +276,11 @@ export function Wizard({ step }: { step: number }) {
   const eduImprovementRolls = getEduImprovementRolls(draft.age);
 
   const canContinue = issues.every((issue) => issue.severity !== "error");
+
+  function getBoundedAge(rawAge: number): number {
+    if (!Number.isFinite(rawAge)) return AGE_MIN;
+    return Math.min(AGE_MAX, Math.max(AGE_MIN, Math.trunc(rawAge)));
+  }
 
   function getSkillMax(bucket: "occupation" | "personal", skill: string) {
     if (isCreditSkill(skill)) {
@@ -619,9 +627,23 @@ export function Wizard({ step }: { step: number }) {
 
         {step === 1 && (
           <div className="grid two">
-            <div className="card">
-              <label>Edad (15-89)</label>
-              <input type="number" min={15} max={89} value={draft.age} onChange={(e) => setAge(Number(e.target.value))} />
+            <div className="card age-card" style={{ gridColumn: "1 / -1" }}>
+              <label htmlFor="age-slider">Edad ({AGE_MIN}-{AGE_MAX})</label>
+              <p className="age-current-value">{draft.age} anos</p>
+              <input
+                id="age-slider"
+                type="range"
+                min={AGE_MIN}
+                max={AGE_MAX}
+                value={draft.age}
+                onChange={(e) => setAge(getBoundedAge(Number(e.target.value)))}
+                aria-label="Seleccionar edad"
+              />
+              <div className="age-markers" aria-hidden="true">
+                {AGE_MARKS.map((mark) => (
+                  <span key={mark}>{mark}</span>
+                ))}
+              </div>
             </div>
             <div className="card" style={{ gridColumn: "1 / -1" }}>
               <p className="kpi">Que implica esta edad</p>

@@ -488,6 +488,77 @@ button.primary.rolling {
   line-height: 1.35;
 }
 
+.age-current-value {
+  margin: 2px 0 8px;
+  font-size: clamp(1.35rem, 4.2vw, 1.9rem);
+  font-weight: 700;
+  color: #dcebd6;
+}
+
+.age-card {
+  display: grid;
+  gap: 4px;
+}
+
+input[type="range"]#age-slider {
+  appearance: none;
+  display: block;
+  width: 100%;
+  padding: 0;
+  min-height: auto;
+  height: 30px;
+  border: 0;
+  background: transparent;
+}
+
+input[type="range"]#age-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #365249, #4f7f6f);
+  border: 1px solid #466359;
+}
+
+input[type="range"]#age-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border-radius: 999px;
+  border: 2px solid #c3dec8;
+  background: radial-gradient(circle at 35% 35%, #f1f8f1, #7fb091 62%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
+}
+
+input[type="range"]#age-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #365249, #4f7f6f);
+  border: 1px solid #466359;
+}
+
+input[type="range"]#age-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid #c3dec8;
+  background: radial-gradient(circle at 35% 35%, #f1f8f1, #7fb091 62%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
+}
+
+.age-markers {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+  color: #9db0ac;
+  font-size: 0.78rem;
+}
+
+.age-markers span {
+  text-align: center;
+}
+
+
 .formula-choice-block {
   margin: 0 0 10px;
 }
