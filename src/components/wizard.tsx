@@ -1184,7 +1184,7 @@ export function Wizard({ step }: { step: number }) {
           <div className="grid two">
             <div className="card age-card" style={{ gridColumn: "1 / -1" }}>
               <label htmlFor="age-slider">Edad ({AGE_MIN}-{AGE_MAX})</label>
-              <p className="age-current-value">{draft.age} anos</p>
+              <p className="age-current-value">{draft.age} años</p>
               <input
                 id="age-slider"
                 type="range"
