@@ -744,11 +744,27 @@ export function validateSkillAllocation(
       severity: "error",
     });
   }
+  if (totalOccupation < occupationPoints) {
+    issues.push({
+      code: "OCCUPATION_POINTS_PENDING",
+      message: "Faltan puntos de ocupacion por asignar (incluyendo Credito).",
+      field: "skills.occupation",
+      severity: "error",
+    });
+  }
 
   if (totalPersonal > personalPoints) {
     issues.push({
       code: "PERSONAL_POINTS_EXCEEDED",
       message: "Se excedieron los puntos de interes personal.",
+      field: "skills.personal",
+      severity: "error",
+    });
+  }
+  if (totalPersonal < personalPoints) {
+    issues.push({
+      code: "PERSONAL_POINTS_PENDING",
+      message: "Faltan puntos de interes personal por asignar.",
       field: "skills.personal",
       severity: "error",
     });
@@ -967,77 +983,11 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 9) {
-    const backgroundFields = [
-      draft.background.descripcionPersonal,
-      draft.background.ideologiaCreencias,
-      draft.background.allegados,
-      draft.background.lugaresSignificativos,
-      draft.background.posesionesPreciadas,
-      draft.background.rasgos,
-    ];
-    const completedBackgroundFields = backgroundFields.filter((value) => value && value.trim().length > 0).length;
-
-    if (completedBackgroundFields < 3) {
-      issues.push({
-        code: "MISSING_BACKGROUND_MINIMUM",
-        message:
-          "Debes completar al menos 3 categorias de trasfondo (descripcion, ideologia/creencias, allegados, lugares, posesiones o rasgos).",
-        field: "background",
-        severity: "error",
-      });
-    }
-
-    if (!draft.background.vinculoPrincipal || draft.background.vinculoPrincipal.trim().length === 0) {
-      issues.push({
-        code: "MISSING_CORE_CONNECTION",
-        message: "Debes indicar el vinculo fundamental del investigador.",
-        field: "background.vinculoPrincipal",
-        severity: "error",
-      });
-    }
-  }
-
-  if (stepId >= 10) {
-    if (!draft.equipment.spendingLevel || draft.equipment.spendingLevel.trim().length === 0) {
-      issues.push({
-        code: "MISSING_SPENDING_LEVEL",
-        message: "Completa el nivel de gasto (Tabla II).",
-        field: "equipment.spendingLevel",
-        severity: "error",
-      });
-    }
-    if (!draft.equipment.cash || draft.equipment.cash.trim().length === 0) {
-      issues.push({
-        code: "MISSING_CASH",
-        message: "Completa el dinero en efectivo (Tabla II).",
-        field: "equipment.cash",
-        severity: "error",
-      });
-    }
-    if (!draft.equipment.assets || draft.equipment.assets.trim().length === 0) {
-      issues.push({
-        code: "MISSING_ASSETS",
-        message: "Completa las propiedades/bienes (Tabla II).",
-        field: "equipment.assets",
-        severity: "error",
-      });
-    }
-    if (!draft.equipment.notes || draft.equipment.notes.trim().length === 0) {
-      issues.push({
-        code: "MISSING_EQUIPMENT_NOTES",
-        message: "Anota armas/equipo/objetos importantes.",
-        field: "equipment.notes",
-        severity: "error",
-      });
-    }
-  }
-
   return issues;
 }
 
 export function finalizeCharacter(draft: CharacterDraft): CharacterSheet {
-  const issues = validateStep(10, draft).filter((issue) => issue.severity === "error");
+  const issues = validateStep(6, draft).filter((issue) => issue.severity === "error");
   if (issues.length > 0) {
     throw new Error(`No se puede finalizar: ${issues.map((i) => i.message).join(" | ")}`);
   }

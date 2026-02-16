@@ -22,7 +22,6 @@ import {
   SKILL_CREATION_MAX,
   validateStep,
 } from "@/domain/rules";
-import { getFinanceByCredit } from "@/domain/finance";
 import type { CharacteristicKey, Characteristics, ValidationIssue } from "@/domain/types";
 import { useCharacterStore } from "@/state/character-store";
 import { toCharacterJson } from "@/services/export";
@@ -448,12 +447,6 @@ export function Wizard({ step }: { step: number }) {
     setCharacteristic,
     setOccupation,
     setSkill,
-    setBackgroundField,
-    setIdentityField,
-    setCompanion,
-    removeCompanion,
-    setEquipmentField,
-    setEquipmentNotes,
     reset,
   } = useCharacterStore();
 
@@ -542,11 +535,6 @@ export function Wizard({ step }: { step: number }) {
   }, [draft.characteristics, draft.skills]);
 
   const personalPoints = (draft.characteristics.INT ?? 0) * 2;
-  const financeSnapshot = useMemo(
-    () => getFinanceByCredit(draft.occupation?.creditRating ?? 0),
-    [draft.occupation?.creditRating],
-  );
-
   const occupationSkillAssigned = Object.entries(draft.skills.occupation).reduce((sum, [skill, points]) => {
     if (isCreditSkill(skill)) return sum;
     return sum + points;
@@ -614,7 +602,7 @@ export function Wizard({ step }: { step: number }) {
   const isSummaryRerollFlow = shouldAutoRerollFromSummary;
   const isSummaryRerollInProgress = shouldAutoRerollFromSummary && !summaryRerollCompleted;
   const summaryRerollReturnStep =
-    Number.isFinite(rerollReturnStep) && rerollReturnStep >= 1 && rerollReturnStep <= 10 ? rerollReturnStep : 3;
+    Number.isFinite(rerollReturnStep) && rerollReturnStep >= 1 && rerollReturnStep <= 8 ? rerollReturnStep : 3;
 
   const canContinue = issues.every((issue) => issue.severity !== "error");
   const activeDiceCount = rollingCharacteristic
@@ -913,7 +901,7 @@ export function Wizard({ step }: { step: number }) {
 
   function goNext() {
     if (!canContinue) return;
-    if (step >= 10) {
+    if (step >= 6) {
       router.push("/crear/resumen");
       return;
     }
@@ -2572,172 +2560,6 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 9 && (
-          <div className="grid two">
-            <div className="card" style={{ gridColumn: "1 / -1" }}>
-              <p className="kpi">Trasfondo</p>
-              <p className="small">
-                Completa las 6 categorias principales con al menos una frase: descripcion personal, ideologia/creencias,
-                allegados, lugares significativos, posesiones preciadas y rasgos.
-              </p>
-            </div>
-            <div className="card">
-              <label>Nombre del investigador</label>
-              <input value={draft.identity.nombre} onChange={(e) => setIdentityField("nombre", e.target.value)} />
-            </div>
-            <div className="card">
-              <label>Genero</label>
-              <input value={draft.identity.genero} onChange={(e) => setIdentityField("genero", e.target.value)} />
-            </div>
-            <div className="card">
-              <label>Lugar de residencia actual</label>
-              <input value={draft.identity.residenciaActual} onChange={(e) => setIdentityField("residenciaActual", e.target.value)} />
-            </div>
-            <div className="card">
-              <label>Lugar de nacimiento</label>
-              <input value={draft.identity.lugarNacimiento} onChange={(e) => setIdentityField("lugarNacimiento", e.target.value)} />
-            </div>
-            <div className="card" style={{ gridColumn: "1 / -1" }}>
-              <label>URL de retrato (opcional)</label>
-              <input value={draft.identity.retratoUrl ?? ""} onChange={(e) => setIdentityField("retratoUrl", e.target.value)} />
-            </div>
-
-            <div className="card">
-              <label>Descripcion personal</label>
-              <textarea
-                value={draft.background.descripcionPersonal ?? ""}
-                onChange={(e) => setBackgroundField("descripcionPersonal", e.target.value)}
-              />
-            </div>
-            <div className="card">
-              <label>Ideologia / creencias</label>
-              <textarea
-                value={draft.background.ideologiaCreencias ?? ""}
-                onChange={(e) => setBackgroundField("ideologiaCreencias", e.target.value)}
-              />
-            </div>
-            <div className="card">
-              <label>Allegados</label>
-              <textarea value={draft.background.allegados ?? ""} onChange={(e) => setBackgroundField("allegados", e.target.value)} />
-            </div>
-            <div className="card">
-              <label>Lugares significativos</label>
-              <textarea
-                value={draft.background.lugaresSignificativos ?? ""}
-                onChange={(e) => setBackgroundField("lugaresSignificativos", e.target.value)}
-              />
-            </div>
-            <div className="card">
-              <label>Posesiones preciadas</label>
-              <textarea
-                value={draft.background.posesionesPreciadas ?? ""}
-                onChange={(e) => setBackgroundField("posesionesPreciadas", e.target.value)}
-              />
-            </div>
-            <div className="card">
-              <label>Rasgos</label>
-              <textarea value={draft.background.rasgos ?? ""} onChange={(e) => setBackgroundField("rasgos", e.target.value)} />
-            </div>
-            <div className="card" style={{ gridColumn: "1 / -1" }}>
-              <label>Vinculo fundamental (obligatorio)</label>
-              <input
-                value={draft.background.vinculoPrincipal ?? ""}
-                onChange={(e) => setBackgroundField("vinculoPrincipal", e.target.value)}
-              />
-            </div>
-
-            <div className="card" style={{ gridColumn: "1 / -1" }}>
-              <p className="kpi">Companeros investigadores</p>
-              {draft.companions.map((companion, index) => (
-                <div key={`${companion.personaje}-${index}`} className="grid three" style={{ marginBottom: 10 }}>
-                  <input
-                    placeholder="Personaje"
-                    value={companion.personaje}
-                    onChange={(e) =>
-                      setCompanion(index, {
-                        ...companion,
-                        personaje: e.target.value,
-                      })
-                    }
-                  />
-                  <input
-                    placeholder="Jugador"
-                    value={companion.jugador}
-                    onChange={(e) =>
-                      setCompanion(index, {
-                        ...companion,
-                        jugador: e.target.value,
-                      })
-                    }
-                  />
-                  <input
-                    placeholder="Resumen"
-                    value={companion.resumen}
-                    onChange={(e) =>
-                      setCompanion(index, {
-                        ...companion,
-                        resumen: e.target.value,
-                      })
-                    }
-                  />
-                  <button type="button" className="ghost" onClick={() => removeCompanion(index)}>
-                    Quitar
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => setCompanion(draft.companions.length, { personaje: "", jugador: "", resumen: "" })}
-              >
-                Anadir companero
-              </button>
-            </div>
-          </div>
-        )}
-
-        {step === 10 && (
-          <div className="grid">
-            <div className="card">
-              <p className="kpi">Finanzas (segun Credito)</p>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => {
-                  setEquipmentField("spendingLevel", financeSnapshot.spendingLevel);
-                }}
-              >
-                Autocompletar nivel de vida
-              </button>
-              <label>Nivel de gasto</label>
-              <input
-                value={draft.equipment.spendingLevel ?? ""}
-                onChange={(e) => setEquipmentField("spendingLevel", e.target.value)}
-                placeholder={financeSnapshot.spendingLevel}
-              />
-              <label>Dinero en efectivo</label>
-              <input
-                value={draft.equipment.cash ?? ""}
-                onChange={(e) => setEquipmentField("cash", e.target.value)}
-                placeholder="Consulta Tabla II del manual"
-              />
-              <label>Propiedades / bienes</label>
-              <input
-                value={draft.equipment.assets ?? ""}
-                onChange={(e) => setEquipmentField("assets", e.target.value)}
-                placeholder="Consulta Tabla II del manual"
-              />
-            </div>
-            <div className="card">
-              <label>Armas/equipo/objetos importantes</label>
-              <textarea value={draft.equipment.notes} onChange={(e) => setEquipmentNotes(e.target.value)} />
-            </div>
-            <div className="card">
-              <p className="kpi">Al finalizar se calcula hoja completa y exportaciones.</p>
-            </div>
-          </div>
-        )}
-
         {activeSkillHelp && (
           <div className="skill-detail-modal" role="dialog" aria-modal="true" aria-label={`Ayuda de ${activeSkillHelp.skill}`}>
             <div className="skill-detail-overlay" onClick={() => setHelpSkillOpen(null)} />
@@ -2774,7 +2596,7 @@ export function Wizard({ step }: { step: number }) {
               Atras
             </button>
             <button className="primary" type="button" onClick={goNext} disabled={!canContinue}>
-              {step >= 10 ? "Ir al resumen" : "Siguiente"}
+              {step >= 6 ? "Ir al resumen" : "Siguiente"}
             </button>
             <button
               className="ghost"
@@ -2896,7 +2718,7 @@ export function Summary() {
         )}
 
         <div className="actions">
-          <button className="ghost" type="button" onClick={() => router.push("/crear/10")}>
+          <button className="ghost" type="button" onClick={() => router.push("/crear/6")}>
             Volver a editar
           </button>
           <button

@@ -48,18 +48,6 @@
       "key": "revision_ocupacion",
       "title": "Revision de ocupacion",
       "description": "Confirmar Credito elegido y balance final de puntos de ocupacion."
-    },
-    {
-      "id": 9,
-      "key": "trasfondo",
-      "title": "Crear trasfondo",
-      "description": "Definir historia personal, motivaciones, allegados, rasgos y elementos clave del personaje."
-    },
-    {
-      "id": 10,
-      "key": "equipo",
-      "title": "Equipar investigador",
-      "description": "Determinar dinero/propiedades y anotar equipo, armas y objetos relevantes."
     }
   ]
 }

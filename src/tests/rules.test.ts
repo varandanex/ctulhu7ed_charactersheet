@@ -141,6 +141,12 @@ describe("domain rules", () => {
     expect(issues.some((issue) => issue.code === "OCCUPATION_POINTS_EXCEEDED")).toBe(true);
   });
 
+  it("requires assigning all occupation and personal points", () => {
+    const issues = validateSkillAllocation(100, 100, { Psicologia: 10 }, { Historia: 20 }, 0);
+    expect(issues.some((issue) => issue.code === "OCCUPATION_POINTS_PENDING")).toBe(true);
+    expect(issues.some((issue) => issue.code === "PERSONAL_POINTS_PENDING")).toBe(true);
+  });
+
   it("ignores credit skill values in skill buckets", () => {
     const issues = validateSkillAllocation(120, 100, { Credito: 50, Psicologia: 10 }, { Credito: 90, Historia: 20 }, 70);
     expect(issues.some((issue) => issue.code === "OCCUPATION_POINTS_EXCEEDED")).toBe(false);
@@ -272,58 +278,6 @@ describe("domain rules", () => {
 
     const issues = validateStep(4, draft);
     expect(issues.some((issue) => issue.code === "MISSING_OCCUPATION")).toBe(true);
-  });
-
-  it("requires minimum background and core connection in step 9", () => {
-    const draft: CharacterDraft = {
-      mode: "random",
-      age: 25,
-      era: "clasica",
-      agePenaltyAllocation: defaultAllocation,
-      characteristics: sampleCharacteristics,
-      occupation: {
-        name: "Abogado",
-        creditRating: 40,
-        selectedSkills: [],
-        selectedChoices: {
-          "0:interpersonales": ["Persuasion", "Encanto"],
-          "1:libres": ["Historia", "Descubrir"],
-        },
-        formulaChoices: {},
-      },
-      skills: {
-        occupation: {
-          "Buscar libros": 100,
-        },
-        personal: {},
-      },
-      background: {
-        descripcionPersonal: "Reservado y meticuloso.",
-        ideologiaCreencias: "Confia en la ley.",
-        allegados: "Su hermana Clara.",
-        lugaresSignificativos: "",
-        posesionesPreciadas: "",
-        rasgos: "",
-        vinculoPrincipal: "",
-      },
-      identity: {
-        nombre: "",
-        genero: "",
-        residenciaActual: "",
-        lugarNacimiento: "",
-      },
-      companions: [],
-      equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
-    };
-
-    const missingCoreFields = validateStep(9, draft);
-    expect(missingCoreFields.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
-    expect(missingCoreFields.some((issue) => issue.code === "MISSING_CORE_CONNECTION")).toBe(true);
-
-    draft.background.vinculoPrincipal = "Su hermana Clara";
-    const completeBackground = validateStep(9, draft);
-    expect(completeBackground.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
-    expect(completeBackground.some((issue) => issue.code === "MISSING_CORE_CONNECTION")).toBe(false);
   });
 
   it("warns when age changes after random roll generation", () => {
