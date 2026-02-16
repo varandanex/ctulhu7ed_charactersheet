@@ -1412,6 +1412,15 @@ input[type="range"]#age-slider::-moz-range-thumb {
   transform: translateY(-1px);
 }
 
+.occupation-choice-option:focus {
+  outline: none;
+}
+
+.occupation-choice-option:focus-visible {
+  outline: 2px dashed rgba(142, 224, 197, 0.78);
+  outline-offset: 2px;
+}
+
 .occupation-choice-option.is-selected {
   border-color: #8ee0c5;
   background: linear-gradient(180deg, rgba(75, 145, 121, 0.3), rgba(36, 74, 63, 0.35));
@@ -1518,6 +1527,18 @@ input[type="range"]#age-slider::-moz-range-thumb {
     0 10px 20px rgba(0, 0, 0, 0.2);
 }
 
+.skill-total-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.skill-total-summary {
+  min-width: 0;
+  flex: 1;
+}
+
 .skill-total-label {
   margin: 0;
   font-size: 0.72rem;
@@ -1534,10 +1555,36 @@ input[type="range"]#age-slider::-moz-range-thumb {
   color: #e9fff6;
 }
 
-.skill-total-breakdown {
-  margin: 6px 0 0;
-  font-size: 0.78rem;
-  color: #bfdbd2;
+.skill-thresholds {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.skill-threshold-chip {
+  min-width: 88px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(133, 208, 182, 0.35);
+  background: linear-gradient(165deg, rgba(44, 80, 69, 0.45), rgba(31, 55, 50, 0.35));
+  text-align: right;
+}
+
+.skill-threshold-chip span {
+  display: block;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #98b8ad;
+}
+
+.skill-threshold-chip strong {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.9rem;
+  line-height: 1.1;
+  color: #defff3;
 }
 
 .number-stepper {

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildDefaultChoiceSelections, expandSkillEntry, isAllowedOccupationSkill, normalizeSkillName } from "@/domain/occupation";
+import {
+  buildDefaultChoiceSelections,
+  expandSkillEntry,
+  getChoiceGroupSkillOptions,
+  isAllowedOccupationSkill,
+  normalizeSkillName,
+} from "@/domain/occupation";
 import { professionCatalog } from "@/rules-data/catalog";
 import type { OccupationSelection } from "@/domain/types";
 
@@ -76,5 +82,11 @@ describe("occupation helpers", () => {
       Object.values(buildDefaultChoiceSelections(occupation.name)).flat(),
     );
     expect(allDefaultSelections.some((skill) => normalizeSkillName(skill) === "mitos de cthulhu")).toBe(false);
+  });
+
+  it("does not expand libre(cualquiera) to the full global catalog in the picker", () => {
+    const libreOptions = getChoiceGroupSkillOptions(1, "Abogado");
+    expect(libreOptions).toContain("Derecho");
+    expect(libreOptions).not.toContain("Cerrajeria");
   });
 });

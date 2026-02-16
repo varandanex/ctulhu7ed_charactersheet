@@ -17,12 +17,13 @@ import {
   evaluateOccupationPointsFormula,
   extractOccupationFormulaChoiceGroups,
   finalizeCharacter,
+  pickHighestOccupationFormulaChoices,
   rollCharacteristicWithAgeModifiersDetailed,
   SKILL_CREATION_MAX,
   validateStep,
 } from "@/domain/rules";
 import { getFinanceByCredit } from "@/domain/finance";
-import type { CharacteristicKey, ValidationIssue } from "@/domain/types";
+import type { CharacteristicKey, Characteristics, ValidationIssue } from "@/domain/types";
 import { useCharacterStore } from "@/state/character-store";
 import { toCharacterJson } from "@/services/export";
 import { clearClientData } from "@/lib/client-data";
@@ -116,6 +117,30 @@ function getOccupationImagePath(name: string): string {
 
 function isCreditSkill(skill: string): boolean {
   return normalizeSkillName(skill) === "credito";
+}
+
+function hasCompleteCharacteristics(characteristics: Partial<Characteristics>): characteristics is Characteristics {
+  return characteristicKeys.every((key) => typeof characteristics[key] === "number");
+}
+
+function buildAutomaticFormulaChoices(
+  formula: string,
+  characteristics: Partial<Characteristics>,
+): Record<string, string> {
+  const groups = extractOccupationFormulaChoiceGroups(formula);
+  if (groups.length === 0) return {};
+
+  if (hasCompleteCharacteristics(characteristics)) {
+    return pickHighestOccupationFormulaChoices(formula, characteristics);
+  }
+
+  return groups.reduce(
+    (acc, group) => {
+      acc[group.key] = group.options[0];
+      return acc;
+    },
+    {} as Record<string, string>,
+  );
 }
 
 function getChoiceKey(index: number, label: string): string {
@@ -351,8 +376,8 @@ function Issues({ issues }: { issues: ValidationIssue[] }) {
   if (issues.length === 0) return null;
   return (
     <div>
-      {issues.map((issue) => (
-        <div className="alert" key={`${issue.code}-${issue.field}`}>
+      {issues.map((issue, index) => (
+        <div className="alert" key={`${issue.code}-${issue.field}-${index}`}>
           {issue.message}
         </div>
       ))}
@@ -839,17 +864,6 @@ export function Wizard({ step }: { step: number }) {
     });
   }
 
-  function setOccupationFormulaChoice(choiceKey: string, selectedOption: string) {
-    if (!draft.occupation) return;
-    setOccupation({
-      ...draft.occupation,
-      formulaChoices: {
-        ...(draft.occupation.formulaChoices ?? {}),
-        [choiceKey]: selectedOption,
-      },
-    });
-  }
-
   function goNext() {
     if (!canContinue) return;
     if (step >= 10) {
@@ -1028,13 +1042,7 @@ export function Wizard({ step }: { step: number }) {
     const hasFormulaChoices = Object.keys(draft.occupation.formulaChoices ?? {}).length >= requiredFormulaChoiceCount;
     if (hasChoiceGroups && hasFormulaChoices) return;
     const selectedChoices = buildDefaultChoiceSelections(draft.occupation.name);
-    const formulaChoices = extractOccupationFormulaChoiceGroups(selectedOccupation.occupation_points_formula).reduce(
-      (acc, group) => {
-        acc[group.key] = group.options[0];
-        return acc;
-      },
-      {} as Record<string, string>,
-    );
+    const formulaChoices = buildAutomaticFormulaChoices(selectedOccupation.occupation_points_formula, draft.characteristics);
     const selectedSkills = collectAllowedOccupationSkills({
       ...draft.occupation,
       selectedChoices,
@@ -1046,6 +1054,25 @@ export function Wizard({ step }: { step: number }) {
       formulaChoices,
     });
   }, [draft.occupation, setOccupation, step]);
+
+  useEffect(() => {
+    if (!draft.occupation) return;
+    const selectedOccupation = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
+    if (!selectedOccupation) return;
+
+    const automaticFormulaChoices = buildAutomaticFormulaChoices(selectedOccupation.occupation_points_formula, draft.characteristics);
+    const currentFormulaChoices = draft.occupation.formulaChoices ?? {};
+    const sameChoiceSet =
+      Object.keys(automaticFormulaChoices).length === Object.keys(currentFormulaChoices).length &&
+      Object.entries(automaticFormulaChoices).every(([key, value]) => currentFormulaChoices[key] === value);
+
+    if (sameChoiceSet) return;
+
+    setOccupation({
+      ...draft.occupation,
+      formulaChoices: automaticFormulaChoices,
+    });
+  }, [draft.characteristics, draft.occupation, setOccupation]);
 
   useEffect(() => {
     if (occupationSlideIndex < allOccupations.length) return;
@@ -1060,13 +1087,7 @@ export function Wizard({ step }: { step: number }) {
     const preservedChoices = isCurrentSelection ? draft.occupation?.selectedChoices : undefined;
     const preservedFormulaChoices = isCurrentSelection ? draft.occupation?.formulaChoices : undefined;
     const selectedChoices = buildDefaultChoiceSelections(selected.name);
-    const formulaChoices = extractOccupationFormulaChoiceGroups(selected.occupation_points_formula).reduce(
-      (acc, group) => {
-        acc[group.key] = group.options[0];
-        return acc;
-      },
-      {} as Record<string, string>,
-    );
+    const formulaChoices = buildAutomaticFormulaChoices(selected.occupation_points_formula, draft.characteristics);
     const finalChoices = preservedChoices && Object.keys(preservedChoices).length > 0 ? preservedChoices : selectedChoices;
     const finalFormulaChoices =
       preservedFormulaChoices && Object.keys(preservedFormulaChoices).length > 0 ? preservedFormulaChoices : formulaChoices;
@@ -1811,7 +1832,9 @@ export function Wizard({ step }: { step: number }) {
                         {occupation.choice_groups.map((group, index) => {
                           const key = getChoiceKey(index, group.label);
                           const options = getChoiceGroupSkillOptions(index, occupation.name);
-                          const selectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
+                          const optionSet = new Set(options);
+                          const rawSelectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
+                          const selectedValues = rawSelectedValues.filter((value) => optionSet.has(value));
                           const hasForbiddenOption = options.some((option) => isForbiddenInitialCreationSkill(option));
                           return (
                             <div key={key} className="occupation-choice-group">
@@ -1912,7 +1935,10 @@ export function Wizard({ step }: { step: number }) {
                         <p className="kpi">Especialidades elegidas</p>
                         {occupation.choice_groups.map((group, index) => {
                           const key = getChoiceKey(index, group.label);
-                          const selectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
+                          const options = getChoiceGroupSkillOptions(index, occupation.name);
+                          const optionSet = new Set(options);
+                          const rawSelectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
+                          const selectedValues = rawSelectedValues.filter((value) => optionSet.has(value));
                           return (
                             <div key={`summary-${key}`} className="occupation-choice-summary-group">
                               <p className="small">
@@ -1956,14 +1982,14 @@ export function Wizard({ step }: { step: number }) {
                   <div className="card" style={{ gridColumn: "1 / -1" }}>
                     <p className="kpi">Eleccion de formula de puntos</p>
                     <p className="small">
-                      Selecciona la rama exacta que aplica al investigador. No se calcula automaticamente por valor maximo.
+                      La rama se selecciona automaticamente usando la combinacion que da mas puntos para esta ocupacion.
                     </p>
                     {occupationFormulaChoices.map((choice) => (
                       <div key={choice.key} className="formula-choice-block">
                         <label>{choice.options.map((option) => formatFormulaOption(option)).join(" o ")}</label>
                         <select
                           value={draft.occupation?.formulaChoices?.[choice.key] ?? choice.options[0]}
-                          onChange={(event) => setOccupationFormulaChoice(choice.key, event.target.value)}
+                          disabled
                         >
                           {choice.options.map((option) => (
                             <option value={option} key={option}>
@@ -1990,7 +2016,23 @@ export function Wizard({ step }: { step: number }) {
               <div className="card points-card">
                 <p className="kpi">Puntos de ocupacion</p>
                 <p>Total: {occupationPoints}</p>
-                <p>Credito: {occupationCreditAssigned}</p>
+                <label>Credito {occupation ? `(${occupation.credit_range})` : ""}</label>
+                <input
+                  type="number"
+                  value={occupationCreditAssigned}
+                  min={occupationCreditRange?.min ?? 0}
+                  max={occupationCreditRange?.max ?? 99}
+                  onChange={(e) => {
+                    if (!draft.occupation) return;
+                    const min = occupationCreditRange?.min ?? 0;
+                    const max = occupationCreditRange?.max ?? 99;
+                    const bounded = Math.min(Math.max(Number(e.target.value), min), max);
+                    setOccupation({
+                      ...draft.occupation,
+                      creditRating: bounded,
+                    });
+                  }}
+                />
                 <p>Habilidades: {occupationSkillAssigned}</p>
                 <p>Asignados: {occupationAssigned}</p>
                 <p className={`points-state ${pointsStateClass(occupationRemaining)}`}>Restantes: {occupationRemaining}</p>
@@ -2084,9 +2126,22 @@ export function Wizard({ step }: { step: number }) {
                         </button>
                       </div>
                       <div className="skill-total-badge">
-                        <p className="skill-total-label">Total final</p>
-                        <strong>{skillTotal}</strong>
-                        <p className="skill-total-breakdown">Base {skillBase} + Ocupacion {skillOccupation} + Interes {skillPersonal}</p>
+                        <div className="skill-total-main">
+                          <div className="skill-total-summary">
+                            <p className="skill-total-label">Total final</p>
+                            <strong>{skillTotal}</strong>
+                          </div>
+                          <div className="skill-thresholds" aria-label="Dificultad de tiradas">
+                            <div className="skill-threshold-chip">
+                              <span>Dificil</span>
+                              <strong>{skillComputed?.hard ?? 0}</strong>
+                            </div>
+                            <div className="skill-threshold-chip">
+                              <span>Extrema</span>
+                              <strong>{skillComputed?.extreme ?? 0}</strong>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       <div className="grid three">
                         <div>
@@ -2156,9 +2211,6 @@ export function Wizard({ step }: { step: number }) {
                           </div>
                         </div>
                       </div>
-                      <p className="small">
-                        Dificil {skillComputed?.hard ?? 0} | Extrema {skillComputed?.extreme ?? 0}
-                      </p>
                     </div>
                   );
                 })()
@@ -2197,9 +2249,22 @@ export function Wizard({ step }: { step: number }) {
                         </button>
                       </div>
                       <div className="skill-total-badge">
-                        <p className="skill-total-label">Total final</p>
-                        <strong>{skillTotal}</strong>
-                        <p className="skill-total-breakdown">Base {skillBase} + Ocupacion {skillOccupation} + Interes {skillPersonal}</p>
+                        <div className="skill-total-main">
+                          <div className="skill-total-summary">
+                            <p className="skill-total-label">Total final</p>
+                            <strong>{skillTotal}</strong>
+                          </div>
+                          <div className="skill-thresholds" aria-label="Dificultad de tiradas">
+                            <div className="skill-threshold-chip">
+                              <span>Dificil</span>
+                              <strong>{skillComputed?.hard ?? 0}</strong>
+                            </div>
+                            <div className="skill-threshold-chip">
+                              <span>Extrema</span>
+                              <strong>{skillComputed?.extreme ?? 0}</strong>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       <div className="grid three">
                         <div>
@@ -2269,9 +2334,6 @@ export function Wizard({ step }: { step: number }) {
                           </div>
                         </div>
                       </div>
-                      <p className="small">
-                        Dificil {skillComputed?.hard ?? 0} | Extrema {skillComputed?.extreme ?? 0}
-                      </p>
                     </div>
                   );
                 })()
@@ -2297,7 +2359,23 @@ export function Wizard({ step }: { step: number }) {
                   <div className="card points-card">
                     <p className="kpi">Puntos de ocupacion</p>
                     <p>Total: {occupationPoints}</p>
-                    <p>Credito: {occupationCreditAssigned}</p>
+                    <label>Credito {occupation ? `(${occupation.credit_range})` : ""}</label>
+                    <input
+                      type="number"
+                      value={occupationCreditAssigned}
+                      min={occupationCreditRange?.min ?? 0}
+                      max={occupationCreditRange?.max ?? 99}
+                      onChange={(e) => {
+                        if (!draft.occupation) return;
+                        const min = occupationCreditRange?.min ?? 0;
+                        const max = occupationCreditRange?.max ?? 99;
+                        const bounded = Math.min(Math.max(Number(e.target.value), min), max);
+                        setOccupation({
+                          ...draft.occupation,
+                          creditRating: bounded,
+                        });
+                      }}
+                    />
                     <p>Habilidades: {occupationSkillAssigned}</p>
                     <p>Asignados: {occupationAssigned}</p>
                     <p className={`points-state ${pointsStateClass(occupationRemaining)}`}>Restantes: {occupationRemaining}</p>
@@ -2321,7 +2399,7 @@ export function Wizard({ step }: { step: number }) {
         {step === 7 && (
           <div className="grid">
             <div className="card" style={{ gridColumn: "1 / -1" }}>
-              <p className="skill-detail-eyebrow">Antes de Credito</p>
+              <p className="skill-detail-eyebrow">Antes de continuar</p>
               <h3>Resumen final de habilidades</h3>
               <p className="small">Revisa los totales por habilidad y usa "Atras" para volver a editar las que quieras ajustar.</p>
             </div>
@@ -2349,19 +2427,9 @@ export function Wizard({ step }: { step: number }) {
             {draft.occupation && occupation && (
               <div className="grid two">
                 <div className="card">
-                  <label>Credito ({occupation.credit_range})</label>
-                  <input
-                    type="number"
-                    value={draft.occupation.creditRating}
-                    min={occupationCreditRange?.min ?? 0}
-                    max={occupationCreditRange?.max ?? 99}
-                    onChange={(e) =>
-                      setOccupation({
-                        ...draft.occupation!,
-                        creditRating: Number(e.target.value),
-                      })
-                    }
-                  />
+                  <p className="kpi">Credito ya definido</p>
+                  <p>Valor elegido: {draft.occupation.creditRating}</p>
+                  <p className="small">Este valor se define en el paso 6, junto con la asignacion de puntos.</p>
                 </div>
                 <div className="card">
                   <p className="kpi">Resumen de puntos de ocupacion</p>

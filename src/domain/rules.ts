@@ -544,6 +544,38 @@ export function evaluateOccupationPointsFormula(
   return evaluateToken(normalized);
 }
 
+export function pickHighestOccupationFormulaChoices(
+  formula: string,
+  characteristics: Characteristics,
+): Record<string, string> {
+  const groups = extractOccupationFormulaChoiceGroups(formula);
+  if (groups.length === 0) return {};
+
+  let bestPoints = Number.NEGATIVE_INFINITY;
+  let bestChoices: Record<string, string> = {};
+  const currentChoices: Record<string, string> = {};
+
+  function walk(groupIndex: number) {
+    if (groupIndex >= groups.length) {
+      const points = evaluateOccupationPointsFormula(formula, characteristics, currentChoices);
+      if (points > bestPoints) {
+        bestPoints = points;
+        bestChoices = { ...currentChoices };
+      }
+      return;
+    }
+
+    const group = groups[groupIndex];
+    for (const option of group.options) {
+      currentChoices[group.key] = option;
+      walk(groupIndex + 1);
+    }
+  }
+
+  walk(0);
+  return bestChoices;
+}
+
 function normalizeFormulaOptionDisplay(option: string): string {
   return option.replace(/X/g, " x ");
 }

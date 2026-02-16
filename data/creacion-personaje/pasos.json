@@ -41,13 +41,13 @@
       "id": 7,
       "key": "resumen_habilidades",
       "title": "Resumen de habilidades",
-      "description": "Revisar los totales finales por habilidad antes de continuar con Credito."
+      "description": "Revisar los totales finales por habilidad antes de continuar."
     },
     {
       "id": 8,
-      "key": "credito",
-      "title": "Elegir Credito",
-      "description": "Asignar el valor final de Credito dentro del rango permitido por la ocupacion."
+      "key": "revision_ocupacion",
+      "title": "Revision de ocupacion",
+      "description": "Confirmar Credito elegido y balance final de puntos de ocupacion."
     },
     {
       "id": 9,

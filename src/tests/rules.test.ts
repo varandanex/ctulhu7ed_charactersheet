@@ -4,6 +4,7 @@ import {
   computeSkillBreakdown,
   computeDerivedStats,
   evaluateOccupationPointsFormula,
+  pickHighestOccupationFormulaChoices,
   rollCharacteristicWithAgeModifiers,
   rollCharacteristicWithAgeModifiersDetailed,
   validateStep,
@@ -63,6 +64,24 @@ describe("domain rules", () => {
       choice_0: "APAX2",
     });
     expect(points).toBe(80 * 2 + 45 * 2);
+  });
+
+  it("picks the highest-value formula choice automatically", () => {
+    const bestChoices = pickHighestOccupationFormulaChoices("EDU x2 + (DES x2 o FUE x2)", sampleCharacteristics);
+    expect(bestChoices).toEqual({
+      choice_0: "FUEX2",
+    });
+  });
+
+  it("picks the highest-value combination across multiple formula groups", () => {
+    const bestChoices = pickHighestOccupationFormulaChoices(
+      "(EDU x4 o EDU x2) + (DES x2 o APA x2 o FUE x2)",
+      sampleCharacteristics,
+    );
+    expect(bestChoices).toEqual({
+      choice_0: "EDUX4",
+      choice_1: "FUEX2",
+    });
   });
 
   it("applies EDU improvement rolls for age 20+", () => {

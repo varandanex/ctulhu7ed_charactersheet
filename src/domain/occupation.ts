@@ -68,7 +68,7 @@ function collectGenericFamilyAllowances(selection: OccupationSelection): Set<str
 
 function looksLikeAnySkillOption(raw: string): boolean {
   const normalized = normalizeText(raw);
-  return normalized.includes("cualquiera") || normalized.includes("especialidades");
+  return normalized === "cualquiera" || normalized.startsWith("cualquiera (");
 }
 
 function selectionHasAnySkillAllowance(selection: OccupationSelection): boolean {
@@ -92,13 +92,15 @@ function selectionHasAnySkillAllowance(selection: OccupationSelection): boolean 
 function expandGenericSpecializedSkill(raw: string): string[] {
   const normalized = normalizeText(raw);
 
-  if (normalized === "combatir" || normalized === "armas de fuego") {
-    const specializedOptions = investigatorSkillsCatalog.skills.filter((skill) => {
-      const normalizedSkill = normalizeText(skill);
-      return normalizedSkill.startsWith(`${normalized} (`) || normalizedSkill.startsWith(`${normalized}(`);
-    });
-    if (specializedOptions.length > 0) {
-      return specializedOptions;
+  for (const family of SPECIALIZABLE_SKILL_FAMILIES) {
+    if (normalized === family || normalized === `${family} (cualquiera)` || normalized === `${family}(cualquiera)`) {
+      const specializedOptions = investigatorSkillsCatalog.skills.filter((skill) => {
+        const normalizedSkill = normalizeText(skill);
+        return normalizedSkill.startsWith(`${family} (`) || normalizedSkill.startsWith(`${family}(`);
+      });
+      if (specializedOptions.length > 0) {
+        return specializedOptions;
+      }
     }
   }
 
@@ -126,13 +128,38 @@ function getGroupKey(index: number, label: string): string {
   return `${index}:${label}`;
 }
 
+function buildOccupationScopedAnyOptions(occupationName: string): string[] {
+  const occupation = professionCatalog.occupations.find((occ) => occ.name === occupationName);
+  if (!occupation) return [...investigatorSkillsCatalog.skills];
+
+  const pool = new Set<string>();
+  const scopedEntries = [
+    ...occupation.skills,
+    ...occupation.choice_groups.flatMap((group) => group.from.filter((entry) => !looksLikeAnySkillOption(entry))),
+  ];
+
+  for (const entry of scopedEntries) {
+    for (const expanded of expandSkillEntry(entry)) {
+      pool.add(expanded);
+    }
+  }
+
+  if (pool.size === 0) return [...investigatorSkillsCatalog.skills];
+  return [...pool];
+}
+
 export function getChoiceGroupSkillOptions(groupIndex: number, occupationName: string): string[] {
   const occupation = professionCatalog.occupations.find((occ) => occ.name === occupationName);
   if (!occupation) return [];
   const group = occupation.choice_groups[groupIndex];
   if (!group) return [];
 
-  const options = group.from.flatMap((entry) => expandSkillEntry(entry));
+  const options = group.from.flatMap((entry) => {
+    if (looksLikeAnySkillOption(entry)) {
+      return buildOccupationScopedAnyOptions(occupationName);
+    }
+    return expandSkillEntry(entry);
+  });
   return [...new Set(options)];
 }
 
