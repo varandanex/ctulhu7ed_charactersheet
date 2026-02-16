@@ -23,6 +23,8 @@ import { getFinanceByCredit } from "@/domain/finance";
 import type { CharacteristicKey, ValidationIssue } from "@/domain/types";
 import { useCharacterStore } from "@/state/character-store";
 import { toCharacterJson } from "@/services/export";
+import { clearClientData } from "@/lib/client-data";
+import { ResetProgressModal } from "@/components/reset-progress-modal";
 
 const characteristicKeys: CharacteristicKey[] = ["FUE", "CON", "TAM", "DES", "APA", "INT", "POD", "EDU", "SUERTE"];
 const occupationImageOverrides: Record<string, string> = {
@@ -153,6 +155,7 @@ function Issues({ issues }: { issues: ValidationIssue[] }) {
 
 export function Wizard({ step }: { step: number }) {
   const router = useRouter();
+  const [showResetModal, setShowResetModal] = useState(false);
   const [mobilePointsOpen, setMobilePointsOpen] = useState(false);
   const [helpSkillOpen, setHelpSkillOpen] = useState<string | null>(null);
   const [rollingCharacteristic, setRollingCharacteristic] = useState<CharacteristicKey | null>(null);
@@ -594,6 +597,13 @@ export function Wizard({ step }: { step: number }) {
       return;
     }
     goToNextOccupation();
+  }
+
+  function handleConfirmReset() {
+    reset();
+    clearClientData();
+    setShowResetModal(false);
+    router.push("/");
   }
 
   return (
@@ -1362,15 +1372,13 @@ export function Wizard({ step }: { step: number }) {
           <button
             className="ghost"
             type="button"
-            onClick={() => {
-              reset();
-              router.push("/crear/1");
-            }}
+            onClick={() => setShowResetModal(true)}
           >
             Reiniciar
           </button>
         </div>
       </section>
+      <ResetProgressModal open={showResetModal} onCancel={() => setShowResetModal(false)} onConfirm={handleConfirmReset} />
     </main>
   );
 }
@@ -1378,6 +1386,7 @@ export function Wizard({ step }: { step: number }) {
 export function Summary() {
   const router = useRouter();
   const { draft, reset } = useCharacterStore();
+  const [showResetModal, setShowResetModal] = useState(false);
 
   let json = "";
   let error = "";
@@ -1385,6 +1394,13 @@ export function Summary() {
     json = toCharacterJson(finalizeCharacter(draft));
   } catch (err) {
     error = err instanceof Error ? err.message : "No se pudo finalizar";
+  }
+
+  function handleConfirmReset() {
+    reset();
+    clearClientData();
+    setShowResetModal(false);
+    router.push("/");
   }
 
   return (
@@ -1448,15 +1464,13 @@ export function Summary() {
           <button
             className="ghost"
             type="button"
-            onClick={() => {
-              reset();
-              router.push("/crear/1");
-            }}
+            onClick={() => setShowResetModal(true)}
           >
             Nuevo personaje
           </button>
         </div>
       </section>
+      <ResetProgressModal open={showResetModal} onCancel={() => setShowResetModal(false)} onConfirm={handleConfirmReset} />
     </main>
   );
 }

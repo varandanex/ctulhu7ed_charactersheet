@@ -729,6 +729,34 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
       });
     }
 
+    const allocation = draft.agePenaltyAllocation ?? getDefaultAgePenaltyAllocation(draft.age);
+    const youthFue = clampPenaltyAllocation(allocation.youthFuePenalty);
+    const youthTam = clampPenaltyAllocation(allocation.youthTamPenalty);
+    const youthExpected = draft.age >= 15 && draft.age <= 19 ? 5 : 0;
+    const youthTotal = youthFue + youthTam;
+
+    if (draft.age >= 15 && draft.age <= 19 && youthTotal !== youthExpected) {
+      issues.push({
+        code: "AGE_YOUTH_PENALTY_MISMATCH",
+        message: "El reparto de penalizador para FUE/TAM debe sumar exactamente 5.",
+        field: "agePenaltyAllocation",
+        severity: "error",
+      });
+    }
+
+    const matureFue = clampPenaltyAllocation(allocation.matureFuePenalty);
+    const matureCon = clampPenaltyAllocation(allocation.matureConPenalty);
+    const matureDes = clampPenaltyAllocation(allocation.matureDesPenalty);
+    const matureExpected = getMaturePenaltyTotal(draft.age);
+    const matureTotal = matureFue + matureCon + matureDes;
+    if (draft.age >= 40 && matureTotal !== matureExpected) {
+      issues.push({
+        code: "AGE_MATURE_PENALTY_MISMATCH",
+        message: `El reparto de penalizador para FUE/CON/DES debe sumar exactamente ${matureExpected}.`,
+        field: "agePenaltyAllocation",
+        severity: "error",
+      });
+    }
   }
 
   if (stepId >= 2) {

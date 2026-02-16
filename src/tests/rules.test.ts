@@ -267,6 +267,69 @@ describe("domain rules", () => {
     expect(issues.some((issue) => issue.code === "AGE_ROLL_MISMATCH" && issue.severity === "warning")).toBe(true);
   });
 
+  it("blocks step 1 when mature age penalties do not match required total", () => {
+    const draft: CharacterDraft = {
+      mode: "random",
+      age: 47,
+      era: "clasica",
+      agePenaltyAllocation: {
+        ...defaultAllocation,
+        matureFuePenalty: 1,
+        matureConPenalty: 9,
+        matureDesPenalty: 3,
+      },
+      characteristics: {},
+      occupation: undefined,
+      skills: {
+        occupation: {},
+        personal: {},
+      },
+      background: {},
+      identity: {
+        nombre: "",
+        genero: "",
+        residenciaActual: "",
+        lugarNacimiento: "",
+      },
+      companions: [],
+      equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
+    };
+
+    const issues = validateStep(1, draft);
+    expect(issues.some((issue) => issue.code === "AGE_MATURE_PENALTY_MISMATCH" && issue.severity === "error")).toBe(true);
+  });
+
+  it("blocks step 1 when youth penalties do not sum exactly to 5", () => {
+    const draft: CharacterDraft = {
+      mode: "random",
+      age: 17,
+      era: "clasica",
+      agePenaltyAllocation: {
+        ...defaultAllocation,
+        youthFuePenalty: 4,
+        youthTamPenalty: 0,
+      },
+      characteristics: {},
+      occupation: undefined,
+      skills: {
+        occupation: {},
+        personal: {},
+      },
+      background: {},
+      identity: {
+        nombre: "",
+        genero: "",
+        residenciaActual: "",
+        lugarNacimiento: "",
+      },
+      companions: [],
+      equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
+    };
+
+    const issues = validateStep(1, draft);
+    expect(issues.some((issue) => issue.code === "AGE_YOUTH_PENALTY_MISMATCH" && issue.severity === "error")).toBe(true);
+  });
+
   it("rolls a single characteristic with age modifiers applied", () => {
     const rolled = rollCharacteristicWithAgeModifiers("EDU", 45, defaultAllocation);
     expect(rolled).toBeGreaterThanOrEqual(1);
