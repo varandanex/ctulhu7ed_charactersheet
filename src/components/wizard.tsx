@@ -2100,6 +2100,27 @@ export function Wizard({ step }: { step: number }) {
 
         {step === 6 && (
           <div className="skills-layout">
+            <div className="mobile-points-bar">
+              <button
+                type="button"
+                className={`mobile-points-item ${pointsStateClass(occupationRemaining)}`}
+                onClick={() => setMobilePointsOpen(true)}
+              >
+                <span className="mobile-points-title">Ocupacion</span>
+                <span className="mobile-points-meta">Gastados: {occupationAssigned}</span>
+                <span className="mobile-points-meta">Pendientes: {occupationRemaining}</span>
+              </button>
+              <button
+                type="button"
+                className={`mobile-points-item ${pointsStateClass(personalRemaining)}`}
+                onClick={() => setMobilePointsOpen(true)}
+              >
+                <span className="mobile-points-title">Interes</span>
+                <span className="mobile-points-meta">Gastados: {personalAssigned}</span>
+                <span className="mobile-points-meta">Pendientes: {personalRemaining}</span>
+              </button>
+            </div>
+
             <aside className="points-sidebar">
               <div className="card points-card">
                 <p className="kpi">Puntos de ocupacion</p>
@@ -2471,15 +2492,6 @@ export function Wizard({ step }: { step: number }) {
                   );
                 })()
               ))}
-            </div>
-
-            <div className="mobile-points-bar">
-              <button type="button" className={`chip ${pointsStateClass(occupationRemaining)}`} onClick={() => setMobilePointsOpen(true)}>
-                Ocupacion: {occupationRemaining}
-              </button>
-              <button type="button" className={`chip ${pointsStateClass(personalRemaining)}`} onClick={() => setMobilePointsOpen(true)}>
-                Interes: {personalRemaining}
-              </button>
             </div>
 
             {mobilePointsOpen && (
