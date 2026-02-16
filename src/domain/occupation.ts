@@ -129,23 +129,7 @@ function getGroupKey(index: number, label: string): string {
 }
 
 function buildOccupationScopedAnyOptions(occupationName: string): string[] {
-  const occupation = professionCatalog.occupations.find((occ) => occ.name === occupationName);
-  if (!occupation) return [...investigatorSkillsCatalog.skills];
-
-  const pool = new Set<string>();
-  const scopedEntries = [
-    ...occupation.skills,
-    ...occupation.choice_groups.flatMap((group) => group.from.filter((entry) => !looksLikeAnySkillOption(entry))),
-  ];
-
-  for (const entry of scopedEntries) {
-    for (const expanded of expandSkillEntry(entry)) {
-      pool.add(expanded);
-    }
-  }
-
-  if (pool.size === 0) return [...investigatorSkillsCatalog.skills];
-  return [...pool];
+  return [...investigatorSkillsCatalog.skills];
 }
 
 export function getChoiceGroupSkillOptions(groupIndex: number, occupationName: string): string[] {
@@ -153,6 +137,8 @@ export function getChoiceGroupSkillOptions(groupIndex: number, occupationName: s
   if (!occupation) return [];
   const group = occupation.choice_groups[groupIndex];
   if (!group) return [];
+  const groupHasAnySkillOption = group.from.some((entry) => looksLikeAnySkillOption(entry));
+  const fixedOccupationSkills = new Set(occupation.skills.flatMap((skill) => expandSkillEntry(skill)).map((skill) => normalizeText(skill)));
 
   const options = group.from.flatMap((entry) => {
     if (looksLikeAnySkillOption(entry)) {
@@ -160,7 +146,10 @@ export function getChoiceGroupSkillOptions(groupIndex: number, occupationName: s
     }
     return expandSkillEntry(entry);
   });
-  return [...new Set(options)];
+  const uniqueOptions = [...new Set(options)];
+  if (!groupHasAnySkillOption) return uniqueOptions;
+
+  return uniqueOptions.filter((option) => !fixedOccupationSkills.has(normalizeText(option)));
 }
 
 export function buildDefaultChoiceSelections(occupationName: string): Record<string, string[]> {

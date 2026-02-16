@@ -867,7 +867,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 4) {
+  if (stepId >= 6) {
     if (!draft.occupation) {
       issues.push({
         code: "MISSING_OCCUPATION",

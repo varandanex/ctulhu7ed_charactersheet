@@ -84,9 +84,10 @@ describe("occupation helpers", () => {
     expect(allDefaultSelections.some((skill) => normalizeSkillName(skill) === "mitos de cthulhu")).toBe(false);
   });
 
-  it("does not expand libre(cualquiera) to the full global catalog in the picker", () => {
+  it("expands libre(cualquiera) to the global catalog while excluding fixed occupation skills", () => {
     const libreOptions = getChoiceGroupSkillOptions(1, "Abogado");
-    expect(libreOptions).toContain("Derecho");
-    expect(libreOptions).not.toContain("Cerrajeria");
+    expect(libreOptions).toContain("Cerrajeria");
+    expect(libreOptions).not.toContain("Buscar libros");
+    expect(libreOptions).not.toContain("Contabilidad");
   });
 });

@@ -477,7 +477,8 @@ export function Wizard({ step }: { step: number }) {
       return a.localeCompare(b, "es");
     };
 
-    const occupationFirst = allSkills.filter((skill) => occupationSet.has(skill) && !isCreditSkill(skill)).sort(byGroupOrder);
+    const occupationFirstCore = allSkills.filter((skill) => occupationSet.has(skill) && !isCreditSkill(skill)).sort(byGroupOrder);
+    const occupationFirst = ["Credito", ...occupationFirstCore];
     const personalOnly = allSkills.filter((skill) => !occupationSet.has(skill) && !isCreditSkill(skill)).sort(byGroupOrder);
     return { occupationFirst, personalOnly };
   }, [occupationSkills, personalSkills]);
@@ -1844,14 +1845,22 @@ export function Wizard({ step }: { step: number }) {
                           const optionSet = new Set(options);
                           const rawSelectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
                           const selectedValues = rawSelectedValues.filter((value) => optionSet.has(value));
-                          const hasForbiddenOption = options.some((option) => isForbiddenInitialCreationSkill(option));
+                          const selectedInOtherGroups = new Set(
+                            Object.entries(draft.occupation?.selectedChoices ?? {})
+                              .filter(([choiceKey]) => choiceKey !== key)
+                              .flatMap(([, values]) => values),
+                          );
+                          const visibleOptions = options.filter(
+                            (option) => selectedValues.includes(option) || !selectedInOtherGroups.has(option),
+                          );
+                          const hasForbiddenOption = visibleOptions.some((option) => isForbiddenInitialCreationSkill(option));
                           return (
                             <div key={key} className="occupation-choice-group">
                               <label>
                                 {group.label} (elige {group.count})
                               </label>
                               <div className="occupation-choice-options">
-                                {options.map((option) => {
+                                {visibleOptions.map((option) => {
                                   const isSelected = selectedValues.includes(option);
                                   const canSelectMore = selectedValues.length < group.count;
                                   const isForbidden = isForbiddenInitialCreationSkill(option);
@@ -2025,23 +2034,6 @@ export function Wizard({ step }: { step: number }) {
               <div className="card points-card">
                 <p className="kpi">Puntos de ocupacion</p>
                 <p>Total: {occupationPoints}</p>
-                <label>Credito {occupation ? `(${occupation.credit_range})` : ""}</label>
-                <input
-                  type="number"
-                  value={occupationCreditAssigned}
-                  min={occupationCreditRange?.min ?? 0}
-                  max={occupationCreditRange?.max ?? 99}
-                  onChange={(e) => {
-                    if (!draft.occupation) return;
-                    const min = occupationCreditRange?.min ?? 0;
-                    const max = occupationCreditRange?.max ?? 99;
-                    const bounded = Math.min(Math.max(Number(e.target.value), min), max);
-                    setOccupation({
-                      ...draft.occupation,
-                      creditRating: bounded,
-                    });
-                  }}
-                />
                 <p>Habilidades: {occupationSkillAssigned}</p>
                 <p>Asignados: {occupationAssigned}</p>
                 <p className={`points-state ${pointsStateClass(occupationRemaining)}`}>Restantes: {occupationRemaining}</p>
@@ -2109,17 +2101,22 @@ export function Wizard({ step }: { step: number }) {
               {groupedSkills.occupationFirst.map((skill) => (
                 (() => {
                   const skillComputed = computedSkills[skill];
-                  const skillBase = skillComputed?.base ?? 0;
-                  const skillOccupation = skillComputed?.occupation ?? 0;
-                  const skillPersonal = skillComputed?.personal ?? 0;
-                  const skillTotal = skillComputed?.total ?? 0;
-                  const canAssignOccupation = isAllowedOccupationSkill(draft.occupation, skill);
-                  const occupationMin = 0;
-                  const occupationMax = canAssignOccupation ? getSkillMax("occupation", skill) : 0;
-                  const occupationValue = draft.skills.occupation[skill] ?? 0;
+                  const isCredit = isCreditSkill(skill);
+                  const skillBase = isCredit ? 0 : (skillComputed?.base ?? 0);
+                  const skillTotal = isCredit ? occupationCreditAssigned : (skillComputed?.total ?? 0);
+                  const skillHard = isCredit ? Math.floor(skillTotal / 2) : (skillComputed?.hard ?? 0);
+                  const skillExtreme = isCredit ? Math.floor(skillTotal / 5) : (skillComputed?.extreme ?? 0);
+                  const canAssignOccupation = isCredit ? true : isAllowedOccupationSkill(draft.occupation, skill);
+                  const occupationMin = isCredit ? (occupationCreditRange?.min ?? 0) : 0;
+                  const occupationMax = isCredit
+                    ? (occupationCreditRange?.max ?? 99)
+                    : canAssignOccupation
+                      ? getSkillMax("occupation", skill)
+                      : 0;
+                  const occupationValue = isCredit ? occupationCreditAssigned : (draft.skills.occupation[skill] ?? 0);
                   const personalMin = 0;
-                  const personalMax = getSkillMax("personal", skill);
-                  const personalValue = draft.skills.personal[skill] ?? 0;
+                  const personalMax = isCredit ? 0 : getSkillMax("personal", skill);
+                  const personalValue = isCredit ? 0 : (draft.skills.personal[skill] ?? 0);
 
                   return (
                     <div className="card" key={skill}>
@@ -2143,11 +2140,11 @@ export function Wizard({ step }: { step: number }) {
                           <div className="skill-thresholds" aria-label="Dificultad de tiradas">
                             <div className="skill-threshold-chip">
                               <span>Dificil</span>
-                              <strong>{skillComputed?.hard ?? 0}</strong>
+                              <strong>{skillHard}</strong>
                             </div>
                             <div className="skill-threshold-chip">
                               <span>Extrema</span>
-                              <strong>{skillComputed?.extreme ?? 0}</strong>
+                              <strong>{skillExtreme}</strong>
                             </div>
                           </div>
                         </div>
@@ -2165,7 +2162,7 @@ export function Wizard({ step }: { step: number }) {
                               className="stepper-btn"
                               aria-label={`Restar 1 punto a ocupacion en ${skill}`}
                               onClick={() => handleSkillChange("occupation", skill, occupationValue - 1)}
-                              disabled={!canAssignOccupation || occupationValue <= occupationMin}
+                              disabled={isCredit ? occupationValue <= occupationMin : !canAssignOccupation || occupationValue <= occupationMin}
                             >
                               -
                             </button>
@@ -2182,12 +2179,16 @@ export function Wizard({ step }: { step: number }) {
                               className="stepper-btn"
                               aria-label={`Sumar 1 punto a ocupacion en ${skill}`}
                               onClick={() => handleSkillChange("occupation", skill, occupationValue + 1)}
-                              disabled={!canAssignOccupation || occupationValue >= occupationMax}
+                              disabled={isCredit ? occupationValue >= occupationMax : !canAssignOccupation || occupationValue >= occupationMax}
                             >
                               +
                             </button>
                           </div>
-                          {!canAssignOccupation && <p className="small">No permitida por tu ocupacion.</p>}
+                          {isCredit ? (
+                            <p className="small">Rango permitido por ocupacion: {occupationCreditRange?.min ?? 0}-{occupationCreditRange?.max ?? 99}.</p>
+                          ) : (
+                            !canAssignOccupation && <p className="small">No permitida por tu ocupacion.</p>
+                          )}
                         </div>
                         <div>
                           <label>Interes</label>
@@ -2197,7 +2198,7 @@ export function Wizard({ step }: { step: number }) {
                               className="stepper-btn"
                               aria-label={`Restar 1 punto a interes en ${skill}`}
                               onClick={() => handleSkillChange("personal", skill, personalValue - 1)}
-                              disabled={personalValue <= personalMin}
+                              disabled={isCredit || personalValue <= personalMin}
                             >
                               -
                             </button>
@@ -2207,13 +2208,14 @@ export function Wizard({ step }: { step: number }) {
                               max={personalMax}
                               value={personalValue}
                               onChange={(e) => handleSkillChange("personal", skill, Number(e.target.value))}
+                              disabled={isCredit}
                             />
                             <button
                               type="button"
                               className="stepper-btn"
                               aria-label={`Sumar 1 punto a interes en ${skill}`}
                               onClick={() => handleSkillChange("personal", skill, personalValue + 1)}
-                              disabled={personalValue >= personalMax}
+                              disabled={isCredit || personalValue >= personalMax}
                             >
                               +
                             </button>
@@ -2233,8 +2235,6 @@ export function Wizard({ step }: { step: number }) {
                 (() => {
                   const skillComputed = computedSkills[skill];
                   const skillBase = skillComputed?.base ?? 0;
-                  const skillOccupation = skillComputed?.occupation ?? 0;
-                  const skillPersonal = skillComputed?.personal ?? 0;
                   const skillTotal = skillComputed?.total ?? 0;
                   const canAssignOccupation = isAllowedOccupationSkill(draft.occupation, skill);
                   const occupationMin = 0;
@@ -2368,23 +2368,6 @@ export function Wizard({ step }: { step: number }) {
                   <div className="card points-card">
                     <p className="kpi">Puntos de ocupacion</p>
                     <p>Total: {occupationPoints}</p>
-                    <label>Credito {occupation ? `(${occupation.credit_range})` : ""}</label>
-                    <input
-                      type="number"
-                      value={occupationCreditAssigned}
-                      min={occupationCreditRange?.min ?? 0}
-                      max={occupationCreditRange?.max ?? 99}
-                      onChange={(e) => {
-                        if (!draft.occupation) return;
-                        const min = occupationCreditRange?.min ?? 0;
-                        const max = occupationCreditRange?.max ?? 99;
-                        const bounded = Math.min(Math.max(Number(e.target.value), min), max);
-                        setOccupation({
-                          ...draft.occupation,
-                          creditRating: bounded,
-                        });
-                      }}
-                    />
                     <p>Habilidades: {occupationSkillAssigned}</p>
                     <p>Asignados: {occupationAssigned}</p>
                     <p className={`points-state ${pointsStateClass(occupationRemaining)}`}>Restantes: {occupationRemaining}</p>
