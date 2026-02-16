@@ -184,6 +184,16 @@ main {
   display: block;
 }
 
+.home-share-qr-button {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: zoom-in;
+}
+
 .home-share-copy {
   min-width: 0;
 }
@@ -208,6 +218,75 @@ main {
 
 .home-share-link:hover {
   color: #f2fff9;
+}
+
+.home-qr-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+}
+
+.home-qr-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(73, 129, 107, 0.16), transparent 40%),
+    rgba(5, 8, 9, 0.8);
+  backdrop-filter: blur(2px);
+}
+
+.home-qr-sheet {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 20px));
+  border: 1px solid #3c5552;
+  border-radius: 16px;
+  padding: 14px;
+  background: linear-gradient(170deg, rgba(20, 30, 31, 0.98), rgba(14, 21, 22, 0.98));
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.5);
+}
+
+.home-qr-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.home-qr-sheet-header h3 {
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.home-qr-close {
+  width: auto;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.home-qr-large {
+  display: block;
+  width: min(86vw, 380px);
+  height: auto;
+  margin: 0 auto;
+  border-radius: 10px;
+  border: 1px solid #4b605e;
+  background: #fff;
+}
+
+.home-qr-link {
+  display: block;
+  margin-top: 12px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #d7ebe4;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
 }
 
 .home-cover {
@@ -235,6 +314,16 @@ main {
 
   .home-share-link {
     text-align: center;
+  }
+
+  .home-qr-sheet {
+    width: calc(100vw - 12px);
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .home-qr-large {
+    width: min(92vw, 420px);
   }
 }
 
