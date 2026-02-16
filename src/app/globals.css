@@ -152,6 +152,8 @@ main {
 .home-cta {
   margin-top: 6px;
   display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .home-cta a {

@@ -247,6 +247,33 @@ describe("domain rules", () => {
     expect(issues.some((issue) => issue.code === "INVALID_OCCUPATION_SKILL")).toBe(true);
   });
 
+  it("requires an occupation from step 4 onward", () => {
+    const draft: CharacterDraft = {
+      mode: "random",
+      age: 25,
+      era: "clasica",
+      agePenaltyAllocation: defaultAllocation,
+      characteristics: sampleCharacteristics,
+      occupation: undefined,
+      skills: {
+        occupation: {},
+        personal: {},
+      },
+      background: {},
+      identity: {
+        nombre: "",
+        genero: "",
+        residenciaActual: "",
+        lugarNacimiento: "",
+      },
+      companions: [],
+      equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
+    };
+
+    const issues = validateStep(4, draft);
+    expect(issues.some((issue) => issue.code === "MISSING_OCCUPATION")).toBe(true);
+  });
+
   it("requires minimum background and core connection in step 9", () => {
     const draft: CharacterDraft = {
       mode: "random",

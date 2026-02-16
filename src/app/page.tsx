@@ -10,8 +10,13 @@ export default function HomePage() {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=${encodeURIComponent(shareUrl)}`;
 
   const router = useRouter();
+  const [hasProgress, setHasProgress] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+
+  useEffect(() => {
+    setHasProgress(hasStoredProgress());
+  }, []);
 
   useEffect(() => {
     if (!showQrModal) return;
@@ -30,17 +35,20 @@ export default function HomePage() {
   }, [showQrModal]);
 
   const handleStart = () => {
-    if (hasStoredProgress()) {
+    if (hasProgress) {
       setShowResetModal(true);
       return;
     }
+    router.push("/crear/1");
+  };
 
-    clearClientData();
+  const handleResume = () => {
     router.push("/crear/1");
   };
 
   const confirmResetAndStart = () => {
     clearClientData();
+    setHasProgress(false);
     setShowResetModal(false);
     router.push("/crear/1");
   };
@@ -52,9 +60,20 @@ export default function HomePage() {
           <h1 className="title">Creador de Investigadores</h1>
           <p className="subtitle">La Llamada de Cthulhu 7a - flujo guiado, reglas validadas, exportacion final.</p>
           <div className="home-cta">
-            <button className="primary" type="button" onClick={handleStart}>
-              Empezar creacion
-            </button>
+            {hasProgress ? (
+              <>
+                <button className="primary" type="button" onClick={handleResume}>
+                  Reanudar creacion
+                </button>
+                <button className="ghost" type="button" onClick={handleStart}>
+                  Empezar de nuevo
+                </button>
+              </>
+            ) : (
+              <button className="primary" type="button" onClick={handleStart}>
+                Empezar creacion
+              </button>
+            )}
           </div>
           <div className="home-share" aria-label="Compartir aplicacion con codigo QR">
             <button className="home-share-qr-button" type="button" onClick={() => setShowQrModal(true)} aria-label="Abrir QR en grande">

@@ -867,7 +867,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 6) {
+  if (stepId >= 4) {
     if (!draft.occupation) {
       issues.push({
         code: "MISSING_OCCUPATION",
@@ -884,16 +884,21 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
           field: "occupation.name",
           severity: "error",
         });
-      } else {
-        const range = parseCreditRange(occupation.credit_range);
-        if (draft.occupation.creditRating < range.min || draft.occupation.creditRating > range.max) {
-          issues.push({
-            code: "CREDIT_RANGE",
-            message: `Credito fuera del rango permitido (${range.min}-${range.max}).`,
-            field: "occupation.creditRating",
-            severity: "error",
-          });
-        }
+      }
+    }
+  }
+
+  if (stepId >= 6 && draft.occupation) {
+    const occupation = professionCatalog.occupations.find((occ) => occ.name === draft.occupation?.name);
+    if (occupation) {
+      const range = parseCreditRange(occupation.credit_range);
+      if (draft.occupation.creditRating < range.min || draft.occupation.creditRating > range.max) {
+        issues.push({
+          code: "CREDIT_RANGE",
+          message: `Credito fuera del rango permitido (${range.min}-${range.max}).`,
+          field: "occupation.creditRating",
+          severity: "error",
+        });
       }
     }
   }
