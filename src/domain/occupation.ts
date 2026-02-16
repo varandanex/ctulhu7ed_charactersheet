@@ -1,5 +1,5 @@
 import type { CharacteristicKey, OccupationSelection } from "@/domain/types";
-import { investigatorSkillsCatalog, professionCatalog } from "@/rules-data/catalog";
+import { investigatorSkillsCatalog, professionCatalog, rulesCatalog } from "@/rules-data/catalog";
 
 function normalizeText(raw: string): string {
   return raw
@@ -8,6 +8,14 @@ function normalizeText(raw: string): string {
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function isForbiddenInitialCreationSkill(skill: string): boolean {
+  const normalizedSkill = normalizeText(skill);
+  return rulesCatalog.skill_point_rules.cannot_allocate_to.some((entry) => {
+    const normalizedEntry = normalizeText(entry).replace(/\(.*\)/g, "").trim();
+    return normalizedEntry.length > 0 && normalizedSkill.includes(normalizedEntry);
+  });
 }
 
 function looksLikeAnySkillOption(raw: string): boolean {
@@ -70,7 +78,8 @@ export function buildDefaultChoiceSelections(occupationName: string): Record<str
     (acc, group, index) => {
       const key = getGroupKey(index, group.label);
       const options = getChoiceGroupSkillOptions(index, occupationName);
-      acc[key] = options.slice(0, group.count);
+      const selectableOptions = options.filter((skill) => !isForbiddenInitialCreationSkill(skill));
+      acc[key] = selectableOptions.slice(0, group.count);
       return acc;
     },
     {} as Record<string, string[]>,
@@ -98,7 +107,7 @@ export function validateChoiceSelections(selection?: OccupationSelection): strin
     const key = getGroupKey(index, group.label);
     const selected = (selection.selectedChoices?.[key] ?? []).filter((value) => value.trim().length > 0);
     const allowed = new Set(getChoiceGroupSkillOptions(index, selection.name).map((value) => normalizeText(value)));
-    const inGroup = selected.filter((value) => allowed.has(normalizeText(value)));
+    const inGroup = selected.filter((value) => allowed.has(normalizeText(value)) && !isForbiddenInitialCreationSkill(value));
 
     if (inGroup.length !== group.count) {
       errors.push(`Debes seleccionar ${group.count} habilidad(es) en "${group.label}".`);

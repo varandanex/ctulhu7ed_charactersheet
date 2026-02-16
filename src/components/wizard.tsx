@@ -76,6 +76,14 @@ function normalizeSkillName(skill: string): string {
     .trim();
 }
 
+function isForbiddenInitialCreationSkill(skill: string): boolean {
+  const normalizedSkill = normalizeSkillName(skill);
+  return rulesCatalog.skill_point_rules.cannot_allocate_to.some((entry) => {
+    const normalizedEntry = normalizeSkillName(entry).replace(/\(.*\)/g, "").trim();
+    return normalizedEntry.length > 0 && normalizedSkill.includes(normalizedEntry);
+  });
+}
+
 function toSlug(text: string): string {
   return text
     .normalize("NFD")
@@ -688,7 +696,7 @@ export function Wizard({ step }: { step: number }) {
 
   function setChoiceGroupSkills(groupIndex: number, groupLabel: string, selectedValues: string[], count: number) {
     if (!draft.occupation) return;
-    const bounded = selectedValues.slice(0, count);
+    const bounded = selectedValues.filter((skill) => !isForbiddenInitialCreationSkill(skill)).slice(0, count);
     const key = getChoiceKey(groupIndex, groupLabel);
     const currentChoices = draft.occupation.selectedChoices ?? {};
     const selectedChoices = {
@@ -1542,6 +1550,7 @@ export function Wizard({ step }: { step: number }) {
                           const key = getChoiceKey(index, group.label);
                           const options = getChoiceGroupSkillOptions(index, occupation.name);
                           const selectedValues = draft.occupation?.selectedChoices?.[key] ?? [];
+                          const hasForbiddenOption = options.some((option) => isForbiddenInitialCreationSkill(option));
                           return (
                             <div key={key} className="occupation-choice-group">
                               <label>
@@ -1551,6 +1560,8 @@ export function Wizard({ step }: { step: number }) {
                                 {options.map((option) => {
                                   const isSelected = selectedValues.includes(option);
                                   const canSelectMore = selectedValues.length < group.count;
+                                  const isForbidden = isForbiddenInitialCreationSkill(option);
+                                  const isDisabled = isForbidden || (!isSelected && !canSelectMore);
                                   const optionHelp = getSkillHelp(option);
                                   const optionBaseLabel = formatSkillBaseLabel(optionHelp.base);
                                   return (
@@ -1558,13 +1569,15 @@ export function Wizard({ step }: { step: number }) {
                                       <button
                                         type="button"
                                         className={`occupation-choice-option ${isSelected ? "is-selected" : ""}`}
-                                        disabled={!isSelected && !canSelectMore}
+                                        disabled={isDisabled}
                                         onClick={() => {
+                                          if (isForbidden) return;
                                           const nextValues = isSelected
                                             ? selectedValues.filter((value) => value !== option)
                                             : [...selectedValues, option];
                                           setChoiceGroupSkills(index, group.label, nextValues, group.count);
                                         }}
+                                        title={isForbidden ? "De momento no tienes suficientes conocimientos arcanos." : undefined}
                                       >
                                         <span className="occupation-choice-option-main">
                                           <span
@@ -1596,6 +1609,7 @@ export function Wizard({ step }: { step: number }) {
                                   );
                                 })}
                               </div>
+                              {hasForbiddenOption && <p className="small">Mitos de Cthulhu: de momento no tienes suficientes conocimientos arcanos.</p>}
                               <p className="small">
                                 Seleccionadas: {selectedValues.length} / {group.count}
                               </p>

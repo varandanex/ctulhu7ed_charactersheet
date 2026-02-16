@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { expandSkillEntry, isAllowedOccupationSkill } from "@/domain/occupation";
+import { buildDefaultChoiceSelections, expandSkillEntry, isAllowedOccupationSkill, normalizeSkillName } from "@/domain/occupation";
+import { professionCatalog } from "@/rules-data/catalog";
 import type { OccupationSelection } from "@/domain/types";
 
 describe("occupation helpers", () => {
@@ -29,5 +30,12 @@ describe("occupation helpers", () => {
 
     expect(isAllowedOccupationSkill(selection, "Armas de fuego (Arma corta)")).toBe(true);
     expect(isAllowedOccupationSkill(selection, "Armas de fuego (Fusil/Escopeta)")).toBe(true);
+  });
+
+  it("never preselects Mitos de Cthulhu in default occupation choices", () => {
+    const allDefaultSelections = professionCatalog.occupations.flatMap((occupation) =>
+      Object.values(buildDefaultChoiceSelections(occupation.name)).flat(),
+    );
+    expect(allDefaultSelections.some((skill) => normalizeSkillName(skill) === "mitos de cthulhu")).toBe(false);
   });
 });
