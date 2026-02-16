@@ -1343,8 +1343,16 @@ input[type="range"]#age-slider::-moz-range-thumb {
 .occupation-choice-options {
   margin-top: 8px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
+}
+
+.occupation-choice-option-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
 }
 
 .occupation-choice-option {
@@ -1353,10 +1361,48 @@ input[type="range"]#age-slider::-moz-range-thumb {
   color: #c8d9da;
   border-radius: 999px;
   padding: 7px 12px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
   font-size: 0.9rem;
   line-height: 1.2;
   cursor: pointer;
   transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.occupation-choice-option-label {
+  min-width: 0;
+}
+
+.occupation-choice-option-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.occupation-choice-check {
+  margin-right: 0;
+}
+
+.occupation-choice-check.is-hidden {
+  visibility: hidden;
+}
+
+.occupation-choice-check.is-visible {
+  visibility: visible;
+}
+
+.occupation-choice-option-base {
+  font-size: 0.72rem;
+  color: #b7cbcc;
+  border: 1px solid rgba(111, 162, 143, 0.4);
+  background: rgba(28, 49, 52, 0.5);
+  border-radius: 999px;
+  padding: 3px 8px;
+  white-space: nowrap;
 }
 
 .occupation-choice-option:hover {
@@ -1377,6 +1423,20 @@ input[type="range"]#age-slider::-moz-range-thumb {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
+}
+
+.occupation-choice-help-trigger {
+  border: 1px solid #4f6668;
+  background: rgba(22, 33, 35, 0.9);
+  color: #dce9ea;
+  border-radius: 999px;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .occupation-skill-badge {
@@ -1637,6 +1697,154 @@ input[type="range"]#age-slider::-moz-range-thumb {
 
 .skill-help-sheet p:last-child {
   margin-bottom: 0;
+}
+
+.skill-detail-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 56;
+}
+
+.skill-detail-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(73, 129, 107, 0.16), transparent 40%),
+    rgba(5, 8, 9, 0.76);
+  backdrop-filter: blur(3px);
+}
+
+.skill-detail-sheet {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(720px, calc(100vw - 24px));
+  max-height: min(90vh, 760px);
+  overflow: auto;
+  border: 1px solid #395252;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(97, 142, 118, 0.2), transparent 38%),
+    linear-gradient(170deg, rgba(20, 27, 29, 0.98), rgba(13, 19, 20, 0.98));
+  box-shadow:
+    0 22px 54px rgba(0, 0, 0, 0.52),
+    0 0 0 1px rgba(130, 173, 152, 0.22) inset;
+  padding: 20px 18px 16px;
+}
+
+.skill-detail-title-row {
+  position: relative;
+  margin-bottom: 8px;
+  padding-right: 48px;
+}
+
+.skill-detail-eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #99b4ad;
+}
+
+.skill-detail-title-row h3 {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  line-height: 1.02;
+}
+
+.skill-detail-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid #4f6e68;
+  background: linear-gradient(180deg, rgba(30, 46, 44, 0.95), rgba(21, 31, 30, 0.95));
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.skill-detail-base-row {
+  margin: 12px 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.skill-detail-base-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(74, 102, 98, 0.9);
+  background:
+    radial-gradient(circle at 15% 20%, rgba(98, 152, 130, 0.24), transparent 68%),
+    rgba(18, 27, 28, 0.9);
+}
+
+.skill-detail-base-label {
+  font-size: 0.84rem;
+  color: #a9bfba;
+  line-height: 1;
+}
+
+.skill-detail-base-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 186, 162, 0.58);
+  background:
+    radial-gradient(circle at 18% 20%, rgba(115, 182, 146, 0.3), transparent 70%),
+    rgba(29, 48, 44, 0.72);
+  color: #d8f4e8;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.skill-detail-summary {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+  line-height: 1.4;
+  color: #e8f0eb;
+}
+
+.skill-detail-section {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(66, 88, 86, 0.8);
+  border-radius: 12px;
+  background: rgba(12, 18, 19, 0.44);
+}
+
+.skill-detail-section .kpi {
+  margin: 0 0 4px;
+}
+
+.skill-detail-section p {
+  margin: 0;
+  line-height: 1.35;
+}
+
+@media (max-width: 540px) {
+  .skill-detail-sheet {
+    width: calc(100vw - 12px);
+    border-radius: 14px;
+    padding: 16px 14px 14px;
+  }
+
+  .skill-detail-base-row {
+    width: 100%;
+  }
 }
 
 .guardian-arcane-eye {
@@ -2048,5 +2256,59 @@ pre.json {
 
   .dice-group-paren {
     animation: none;
+  }
+}
+
+.occupation-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.occupation-skill-help-trigger {
+  border: 1px solid #4f6668;
+  background: rgba(22, 33, 35, 0.9);
+  color: #dce9ea;
+  border-radius: 999px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.occupation-info-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.occupation-choice-summary .occupation-skill-chip {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.occupation-choice-summary .occupation-skill-badge.is-selected {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  padding: 7px 12px;
+}
+
+@media (max-width: 880px) {
+  .occupation-skill-chip {
+    width: 100%;
+    justify-content: space-between;
   }
 }

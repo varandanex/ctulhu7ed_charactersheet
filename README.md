@@ -34,7 +34,8 @@ Aplicacion web para facilitar la creacion de hojas de personaje de La Llamada de
 4. `/crear/4` Determinar ocupacion
 5. `/crear/5` Elegir habilidades de ocupacion
 6. `/crear/6` Distribuir puntos de habilidades
-7. `/crear/7` Crear trasfondo
-8. `/crear/8` Equipar investigador
-9. `/crear/resumen` Exportaciones JSON/PDF
+7. `/crear/7` Elegir Credito
+8. `/crear/8` Crear trasfondo
+9. `/crear/9` Equipar investigador
+10. `/crear/resumen` Exportaciones JSON/PDF
 # ctulhu7ed_charactersheet

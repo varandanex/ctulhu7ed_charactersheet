@@ -19,6 +19,18 @@ const skillHelpCatalog: Record<string, Omit<SkillHelp, "skill">> = {
     example: "Disparar en combate bajo presion o valorar que arma conviene en una situacion.",
     complement: "En CoC la violencia suele complicar la investigacion; util para sobrevivir, no para resolver todo.",
   },
+  "armas de fuego (arma corta)": {
+    base: "20%",
+    summary: "Uso de pistolas y revolveres en combate, con enfasis en precision y control a corta distancia.",
+    example: "Responder a una amenaza inmediata en interiores o durante una persecucion urbana.",
+    complement: "Especialidad comun y versatil; suele ser mas util en escenas de ciudad.",
+  },
+  "armas de fuego (fusil/escopeta)": {
+    base: "25%",
+    summary: "Uso de armas largas con mejor rendimiento a media distancia y mayor impacto por disparo.",
+    example: "Cubrir un area abierta o defender una posicion con fuego de largo alcance.",
+    complement: "Muy potente, pero menos discreta y mas situacional en espacios cerrados.",
+  },
   arqueologia: {
     base: "01%",
     summary: "Sirve para estudiar restos del pasado, fechar hallazgos y entender su contexto historico.",

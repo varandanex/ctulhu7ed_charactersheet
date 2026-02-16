@@ -103,6 +103,15 @@ function formatFormulaOption(option: string): string {
   return option.replace(/X/g, " x ");
 }
 
+function formatSkillBaseLabel(base: string): string {
+  const normalized = base.toLowerCase();
+  const percentageMatch = base.match(/\d+%/);
+  if (percentageMatch) return percentageMatch[0];
+  if (normalized.includes("especialidad")) return "Especialidad";
+  const noParen = base.replace(/\s*\([^)]*\)\s*/g, "").trim();
+  return noParen.length > 16 ? noParen.slice(0, 16).trim() : noParen;
+}
+
 function getMaturePenaltyTarget(age: number): number {
   if (age >= 80) return 80;
   if (age >= 70) return 40;
@@ -373,7 +382,7 @@ export function Wizard({ step }: { step: number }) {
     const fallback = ["Mitos de Cthulhu", "Psicologia", "Descubrir", "Buscar libros"];
     const allSkills = personalSkills.length > 0 ? personalSkills : fallback;
     const occupationSet = new Set(occupationSkills);
-    const occupationFirst = allSkills.filter((skill) => occupationSet.has(skill) || isCreditSkill(skill));
+    const occupationFirst = allSkills.filter((skill) => occupationSet.has(skill) && !isCreditSkill(skill));
     const personalOnly = allSkills.filter((skill) => !occupationSet.has(skill) && !isCreditSkill(skill));
     return { occupationFirst, personalOnly };
   }, [occupationSkills, personalSkills]);
@@ -390,6 +399,12 @@ export function Wizard({ step }: { step: number }) {
     () => (occupation ? extractOccupationFormulaChoiceGroups(occupation.occupation_points_formula) : []),
     [occupation],
   );
+  const fixedOccupationSkills = useMemo(() => {
+    const selectedSkills = draft.occupation?.selectedSkills ?? [];
+    const selectedChoices = Object.values(draft.occupation?.selectedChoices ?? {}).flat();
+    const selectedChoicesSet = new Set(selectedChoices);
+    return selectedSkills.filter((skill) => !selectedChoicesSet.has(skill));
+  }, [draft.occupation?.selectedSkills, draft.occupation?.selectedChoices]);
   const computedSkills = useMemo(() => {
     if (!draft.characteristics.INT) return {};
     return computeSkillBreakdown(draft.characteristics as any, draft.skills);
@@ -449,7 +464,7 @@ export function Wizard({ step }: { step: number }) {
   const isSummaryRerollFlow = shouldAutoRerollFromSummary;
   const isSummaryRerollInProgress = shouldAutoRerollFromSummary && !summaryRerollCompleted;
   const summaryRerollReturnStep =
-    Number.isFinite(rerollReturnStep) && rerollReturnStep >= 1 && rerollReturnStep <= 8 ? rerollReturnStep : 3;
+    Number.isFinite(rerollReturnStep) && rerollReturnStep >= 1 && rerollReturnStep <= 9 ? rerollReturnStep : 3;
 
   const canContinue = issues.every((issue) => issue.severity !== "error");
   const activeDiceCount = rollingCharacteristic
@@ -704,7 +719,7 @@ export function Wizard({ step }: { step: number }) {
 
   function goNext() {
     if (!canContinue) return;
-    if (step >= 8) {
+    if (step >= 9) {
       router.push("/crear/resumen");
       return;
     }
@@ -1518,54 +1533,6 @@ export function Wizard({ step }: { step: number }) {
           <div className="grid">
             {draft.occupation && occupation && (
               <div className="grid two">
-                <div className="card">
-                  <label>Credito ({occupation.credit_range})</label>
-                  <input
-                    type="number"
-                    value={draft.occupation.creditRating}
-                    min={occupationCreditRange?.min ?? 0}
-                    max={occupationCreditRange?.max ?? 99}
-                    onChange={(e) =>
-                      setOccupation({
-                        ...draft.occupation!,
-                        creditRating: Number(e.target.value),
-                      })
-                    }
-                  />
-                </div>
-                <div className="card">
-                  <p className="kpi">Habilidades disponibles de ocupacion seleccionada</p>
-                  {occupationSkills.length > 0 ? (
-                    <>
-                      <div className="occupation-skill-group">
-                        <p className="small">Seleccionadas</p>
-                        <div className="occupation-skill-badges">
-                          {occupationSkills
-                            .filter((skill) => draft.occupation?.selectedSkills?.includes(skill))
-                            .map((skill) => (
-                              <span key={`selected-${skill}`} className="occupation-skill-badge is-selected">
-                                {skill}
-                              </span>
-                            ))}
-                        </div>
-                      </div>
-                      <div className="occupation-skill-group">
-                        <p className="small">Disponibles</p>
-                        <div className="occupation-skill-badges">
-                          {occupationSkills
-                            .filter((skill) => !(draft.occupation?.selectedSkills?.includes(skill) ?? false))
-                            .map((skill) => (
-                              <span key={`available-${skill}`} className="occupation-skill-badge is-available">
-                                {skill}
-                              </span>
-                            ))}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="small">Sin listado</p>
-                  )}
-                </div>
                 {occupation.choice_groups.length > 0 && (
                   <div className="card" style={{ gridColumn: "1 / -1" }}>
                     <p className="kpi">Seleccion de opciones de ocupacion</p>
@@ -1584,22 +1551,48 @@ export function Wizard({ step }: { step: number }) {
                                 {options.map((option) => {
                                   const isSelected = selectedValues.includes(option);
                                   const canSelectMore = selectedValues.length < group.count;
+                                  const optionHelp = getSkillHelp(option);
+                                  const optionBaseLabel = formatSkillBaseLabel(optionHelp.base);
                                   return (
-                                    <button
-                                      type="button"
-                                      key={option}
-                                      className={`occupation-choice-option ${isSelected ? "is-selected" : ""}`}
-                                      disabled={!isSelected && !canSelectMore}
-                                      onClick={() => {
-                                        const nextValues = isSelected
-                                          ? selectedValues.filter((value) => value !== option)
-                                          : [...selectedValues, option];
-                                        setChoiceGroupSkills(index, group.label, nextValues, group.count);
-                                      }}
-                                    >
-                                      {isSelected && <span className="occupation-check" aria-hidden="true">✓</span>}
-                                      {option}
-                                    </button>
+                                    <div key={option} className="occupation-choice-option-row">
+                                      <button
+                                        type="button"
+                                        className={`occupation-choice-option ${isSelected ? "is-selected" : ""}`}
+                                        disabled={!isSelected && !canSelectMore}
+                                        onClick={() => {
+                                          const nextValues = isSelected
+                                            ? selectedValues.filter((value) => value !== option)
+                                            : [...selectedValues, option];
+                                          setChoiceGroupSkills(index, group.label, nextValues, group.count);
+                                        }}
+                                      >
+                                        <span className="occupation-choice-option-main">
+                                          <span
+                                            className={`occupation-check occupation-choice-check ${isSelected ? "is-visible" : "is-hidden"}`}
+                                            aria-hidden="true"
+                                          >
+                                            ✓
+                                          </span>
+                                          <span className="occupation-choice-option-label">{option}</span>
+                                        </span>
+                                        <span className="occupation-choice-option-base" title={`Base ${optionHelp.base}`}>
+                                          {optionBaseLabel}
+                                        </span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="occupation-choice-help-trigger"
+                                        onClick={() => setHelpSkillOpen(option)}
+                                        aria-label={`Consultar habilidad ${option}`}
+                                        title={`Informacion de ${option}`}
+                                      >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true" className="occupation-info-icon">
+                                          <circle cx="12" cy="12" r="9" />
+                                          <line x1="12" y1="10.5" x2="12" y2="16" />
+                                          <circle cx="12" cy="7.5" r="1" />
+                                        </svg>
+                                      </button>
+                                    </div>
                                   );
                                 })}
                               </div>
@@ -1611,6 +1604,35 @@ export function Wizard({ step }: { step: number }) {
                         })}
                       </div>
                       <aside className="occupation-choice-summary">
+                        <p className="kpi">Habilidades fijas de ocupacion</p>
+                        <p className="small">Estas vienen definidas por la ocupacion y no se pueden modificar aqui.</p>
+                        <div className="occupation-skill-badges">
+                          {fixedOccupationSkills.length > 0 ? (
+                            fixedOccupationSkills.map((skill) => (
+                              <div key={`fixed-badge-${skill}`} className="occupation-skill-chip">
+                                <span className="occupation-skill-badge is-selected">
+                                  <span className="occupation-check" aria-hidden="true">✓</span>
+                                  {skill}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="occupation-skill-help-trigger"
+                                  onClick={() => setHelpSkillOpen(skill)}
+                                  aria-label={`Consultar habilidad ${skill}`}
+                                  title={`Informacion de ${skill}`}
+                                >
+                                  <svg viewBox="0 0 24 24" aria-hidden="true" className="occupation-info-icon">
+                                    <circle cx="12" cy="12" r="9" />
+                                    <line x1="12" y1="10.5" x2="12" y2="16" />
+                                    <circle cx="12" cy="7.5" r="1" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="occupation-skill-badge is-available">Sin habilidades fijas</span>
+                          )}
+                        </div>
                         <p className="kpi">Especialidades elegidas</p>
                         {occupation.choice_groups.map((group, index) => {
                           const key = getChoiceKey(index, group.label);
@@ -1623,10 +1645,25 @@ export function Wizard({ step }: { step: number }) {
                               <div className="occupation-skill-badges">
                                 {selectedValues.length > 0 ? (
                                   selectedValues.map((skill) => (
-                                    <span key={`summary-badge-${key}-${skill}`} className="occupation-skill-badge is-selected">
-                                      <span className="occupation-check" aria-hidden="true">✓</span>
-                                      {skill}
-                                    </span>
+                                    <div key={`summary-badge-${key}-${skill}`} className="occupation-skill-chip">
+                                      <span className="occupation-skill-badge is-selected">
+                                        <span className="occupation-check" aria-hidden="true">✓</span>
+                                        {skill}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className="occupation-skill-help-trigger"
+                                        onClick={() => setHelpSkillOpen(skill)}
+                                        aria-label={`Consultar habilidad ${skill}`}
+                                        title={`Informacion de ${skill}`}
+                                      >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true" className="occupation-info-icon">
+                                          <circle cx="12" cy="12" r="9" />
+                                          <line x1="12" y1="10.5" x2="12" y2="16" />
+                                          <circle cx="12" cy="7.5" r="1" />
+                                        </svg>
+                                      </button>
+                                    </div>
                                   ))
                                 ) : (
                                   <span className="occupation-skill-badge is-available">Sin seleccionar</span>
@@ -1811,29 +1848,42 @@ export function Wizard({ step }: { step: number }) {
               </div>
             )}
 
-            {activeSkillHelp && (
-              <div className="skill-help-modal" role="dialog" aria-modal="true" aria-label={`Ayuda de ${activeSkillHelp.skill}`}>
-                <div className="skill-help-overlay" onClick={() => setHelpSkillOpen(null)} />
-                <div className="skill-help-sheet">
-                  <div className="skill-help-title-row">
-                    <h3>{activeSkillHelp.skill}</h3>
-                    <button type="button" className="skill-help-close" onClick={() => setHelpSkillOpen(null)} aria-label="Cerrar ayuda">
-                      x
-                    </button>
-                  </div>
-                  <p className="kpi">Base sugerida: {activeSkillHelp.base}</p>
-                  <p>{activeSkillHelp.summary}</p>
-                  <p className="kpi">Ejemplo de uso</p>
-                  <p>{activeSkillHelp.example}</p>
-                  <p className="kpi">Consejo</p>
-                  <p>{activeSkillHelp.complement}</p>
+          </div>
+        )}
+
+        {step === 7 && (
+          <div className="grid">
+            {draft.occupation && occupation && (
+              <div className="grid two">
+                <div className="card">
+                  <label>Credito ({occupation.credit_range})</label>
+                  <input
+                    type="number"
+                    value={draft.occupation.creditRating}
+                    min={occupationCreditRange?.min ?? 0}
+                    max={occupationCreditRange?.max ?? 99}
+                    onChange={(e) =>
+                      setOccupation({
+                        ...draft.occupation!,
+                        creditRating: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="card">
+                  <p className="kpi">Resumen de puntos de ocupacion</p>
+                  <p>Total: {occupationPoints}</p>
+                  <p>Credito: {occupationCreditAssigned}</p>
+                  <p>Habilidades: {occupationSkillAssigned}</p>
+                  <p>Asignados: {occupationAssigned}</p>
+                  <p className={`points-state ${pointsStateClass(occupationRemaining)}`}>Restantes: {occupationRemaining}</p>
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {step === 7 && (
+        {step === 8 && (
           <div className="grid two">
             <div className="card" style={{ gridColumn: "1 / -1" }}>
               <p className="kpi">Trasfondo</p>
@@ -1957,7 +2007,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 8 && (
+        {step === 9 && (
           <div className="grid">
             <div className="card">
               <p className="kpi">Finanzas (segun Credito)</p>
@@ -1999,13 +2049,43 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
+        {activeSkillHelp && (
+          <div className="skill-detail-modal" role="dialog" aria-modal="true" aria-label={`Ayuda de ${activeSkillHelp.skill}`}>
+            <div className="skill-detail-overlay" onClick={() => setHelpSkillOpen(null)} />
+            <div className="skill-detail-sheet">
+              <div className="skill-detail-title-row">
+                <p className="skill-detail-eyebrow">Detalle de habilidad</p>
+                <h3>{activeSkillHelp.skill}</h3>
+                <button type="button" className="skill-detail-close" onClick={() => setHelpSkillOpen(null)} aria-label="Cerrar ayuda">
+                  ×
+                </button>
+              </div>
+              <div className="skill-detail-base-row">
+                <span className="skill-detail-base-chip">
+                  <span className="skill-detail-base-label">Base sugerida</span>
+                  <span className="skill-detail-base-badge">{activeSkillHelp.base}</span>
+                </span>
+              </div>
+              <p className="skill-detail-summary">{activeSkillHelp.summary}</p>
+              <div className="skill-detail-section">
+                <p className="kpi">Ejemplo de uso</p>
+                <p>{activeSkillHelp.example}</p>
+              </div>
+              <div className="skill-detail-section">
+                <p className="kpi">Consejo</p>
+                <p>{activeSkillHelp.complement}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {!isSummaryRerollFlow && (
           <div className="actions">
             <button className="ghost" type="button" onClick={goBack}>
               Atras
             </button>
             <button className="primary" type="button" onClick={goNext} disabled={!canContinue}>
-              {step >= 8 ? "Ir al resumen" : "Siguiente"}
+              {step >= 9 ? "Ir al resumen" : "Siguiente"}
             </button>
             <button
               className="ghost"
@@ -2127,7 +2207,7 @@ export function Summary() {
         )}
 
         <div className="actions">
-          <button className="ghost" type="button" onClick={() => router.push("/crear/8")}>
+          <button className="ghost" type="button" onClick={() => router.push("/crear/9")}>
             Volver a editar
           </button>
           <button

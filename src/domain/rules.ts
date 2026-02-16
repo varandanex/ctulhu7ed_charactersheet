@@ -873,7 +873,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 7) {
+  if (stepId >= 8) {
     const backgroundFields = [
       draft.background.descripcionPersonal,
       draft.background.ideologiaCreencias,
@@ -904,7 +904,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 8) {
+  if (stepId >= 9) {
     if (!draft.equipment.spendingLevel || draft.equipment.spendingLevel.trim().length === 0) {
       issues.push({
         code: "MISSING_SPENDING_LEVEL",
@@ -943,7 +943,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
 }
 
 export function finalizeCharacter(draft: CharacterDraft): CharacterSheet {
-  const issues = validateStep(8, draft).filter((issue) => issue.severity === "error");
+  const issues = validateStep(9, draft).filter((issue) => issue.severity === "error");
   if (issues.length > 0) {
     throw new Error(`No se puede finalizar: ${issues.map((i) => i.message).join(" | ")}`);
   }

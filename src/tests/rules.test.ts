@@ -145,7 +145,7 @@ describe("domain rules", () => {
       equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
     };
 
-    const issues = validateStep(5, draft);
+    const issues = validateStep(6, draft);
     expect(issues.some((issue) => issue.code === "OCCUPATION_POINTS_EXCEEDED")).toBe(true);
   });
 
@@ -183,11 +183,11 @@ describe("domain rules", () => {
       equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
     };
 
-    const issues = validateStep(5, draft);
+    const issues = validateStep(6, draft);
     expect(issues.some((issue) => issue.code === "INVALID_OCCUPATION_SKILL")).toBe(true);
   });
 
-  it("requires minimum background and core connection in step 6", () => {
+  it("requires minimum background and core connection in step 8", () => {
     const draft: CharacterDraft = {
       mode: "random",
       age: 25,
@@ -229,12 +229,12 @@ describe("domain rules", () => {
       equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
     };
 
-    const missingCoreFields = validateStep(6, draft);
+    const missingCoreFields = validateStep(8, draft);
     expect(missingCoreFields.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
     expect(missingCoreFields.some((issue) => issue.code === "MISSING_CORE_CONNECTION")).toBe(true);
 
     draft.background.vinculoPrincipal = "Su hermana Clara";
-    const completeBackground = validateStep(6, draft);
+    const completeBackground = validateStep(8, draft);
     expect(completeBackground.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
     expect(completeBackground.some((issue) => issue.code === "MISSING_CORE_CONNECTION")).toBe(false);
   });

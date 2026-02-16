@@ -23,13 +23,13 @@
       "id": 4,
       "key": "determinar_ocupacion",
       "title": "Determinar ocupacion",
-      "description": "Elegir profesion, rango de Credito y conjunto de habilidades de ocupacion."
+      "description": "Elegir profesion y revisar su conjunto de habilidades de ocupacion."
     },
     {
       "id": 5,
       "key": "seleccion_habilidades_ocupacion",
       "title": "Elegir habilidades de ocupacion",
-      "description": "Configurar Credito, opciones de ocupacion y formula antes de asignar puntos."
+      "description": "Configurar opciones de ocupacion y formula antes de asignar puntos."
     },
     {
       "id": 6,
@@ -39,12 +39,18 @@
     },
     {
       "id": 7,
+      "key": "credito",
+      "title": "Elegir Credito",
+      "description": "Asignar el valor final de Credito dentro del rango permitido por la ocupacion."
+    },
+    {
+      "id": 8,
       "key": "trasfondo",
       "title": "Crear trasfondo",
       "description": "Definir historia personal, motivaciones, allegados, rasgos y elementos clave del personaje."
     },
     {
-      "id": 8,
+      "id": 9,
       "key": "equipo",
       "title": "Equipar investigador",
       "description": "Determinar dinero/propiedades y anotar equipo, armas y objetos relevantes."
