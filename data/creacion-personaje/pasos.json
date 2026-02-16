@@ -39,18 +39,24 @@
     },
     {
       "id": 7,
+      "key": "resumen_habilidades",
+      "title": "Resumen de habilidades",
+      "description": "Revisar los totales finales por habilidad antes de continuar con Credito."
+    },
+    {
+      "id": 8,
       "key": "credito",
       "title": "Elegir Credito",
       "description": "Asignar el valor final de Credito dentro del rango permitido por la ocupacion."
     },
     {
-      "id": 8,
+      "id": 9,
       "key": "trasfondo",
       "title": "Crear trasfondo",
       "description": "Definir historia personal, motivaciones, allegados, rasgos y elementos clave del personaje."
     },
     {
-      "id": 9,
+      "id": 10,
       "key": "equipo",
       "title": "Equipar investigador",
       "description": "Determinar dinero/propiedades y anotar equipo, armas y objetos relevantes."

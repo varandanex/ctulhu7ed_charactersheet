@@ -100,6 +100,23 @@ describe("domain rules", () => {
     expect(computed["Arte (Literatura)"]?.base).toBe(5);
   });
 
+  it("computes base values for infrequent and modern skills from the core book", () => {
+    const computed = computeSkillBreakdown(sampleCharacteristics, {
+      occupation: {
+        Demolicion: 10,
+        Electronica: 10,
+        Informatica: 10,
+        "Armas de fuego (Subfusil)": 10,
+      },
+      personal: {},
+    });
+
+    expect(computed.Demolicion?.base).toBe(1);
+    expect(computed.Electronica?.base).toBe(1);
+    expect(computed.Informatica?.base).toBe(5);
+    expect(computed["Armas de fuego (Subfusil)"]?.base).toBe(15);
+  });
+
   it("counts credit as occupation points", () => {
     const issues = validateSkillAllocation(100, 100, { Psicologia: 30 }, { Historia: 10 }, 80);
     expect(issues.some((issue) => issue.code === "OCCUPATION_POINTS_EXCEEDED")).toBe(true);
@@ -109,6 +126,30 @@ describe("domain rules", () => {
     const issues = validateSkillAllocation(120, 100, { Credito: 50, Psicologia: 10 }, { Credito: 90, Historia: 20 }, 70);
     expect(issues.some((issue) => issue.code === "OCCUPATION_POINTS_EXCEEDED")).toBe(false);
     expect(issues.some((issue) => issue.code === "PERSONAL_POINTS_EXCEEDED")).toBe(false);
+  });
+
+  it("rejects skill totals above creation cap", () => {
+    const issues = validateSkillAllocation(
+      200,
+      200,
+      { "Armas de fuego (Arma corta)": 55 },
+      { "Armas de fuego (Arma corta)": 1 },
+      0,
+      sampleCharacteristics,
+    );
+    expect(issues.some((issue) => issue.code === "SKILL_CREATION_CAP_EXCEEDED")).toBe(true);
+  });
+
+  it("rejects skill totals above absolute cap", () => {
+    const issues = validateSkillAllocation(
+      300,
+      300,
+      { "Armas de fuego (Arma corta)": 80 },
+      { "Armas de fuego (Arma corta)": 5 },
+      0,
+      sampleCharacteristics,
+    );
+    expect(issues.some((issue) => issue.code === "SKILL_ABSOLUTE_CAP_EXCEEDED")).toBe(true);
   });
 
   it("validates occupation budget including credit rating", () => {
@@ -157,12 +198,12 @@ describe("domain rules", () => {
       agePenaltyAllocation: defaultAllocation,
       characteristics: sampleCharacteristics,
       occupation: {
-        name: "Abogado",
-        creditRating: 40,
+        name: "Agente de policia",
+        creditRating: 20,
         selectedSkills: [],
         selectedChoices: {
-          "0:interpersonales": ["Persuasion", "Encanto"],
-          "1:libres": ["Historia", "Descubrir"],
+          "0:interpersonal": ["Persuasion"],
+          "1:especialidad personal": ["Conducir automovil"],
         },
         formulaChoices: {},
       },
@@ -187,7 +228,7 @@ describe("domain rules", () => {
     expect(issues.some((issue) => issue.code === "INVALID_OCCUPATION_SKILL")).toBe(true);
   });
 
-  it("requires minimum background and core connection in step 8", () => {
+  it("requires minimum background and core connection in step 9", () => {
     const draft: CharacterDraft = {
       mode: "random",
       age: 25,
@@ -229,12 +270,12 @@ describe("domain rules", () => {
       equipment: { notes: "", spendingLevel: "", cash: "", assets: "", items: [] },
     };
 
-    const missingCoreFields = validateStep(8, draft);
+    const missingCoreFields = validateStep(9, draft);
     expect(missingCoreFields.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
     expect(missingCoreFields.some((issue) => issue.code === "MISSING_CORE_CONNECTION")).toBe(true);
 
     draft.background.vinculoPrincipal = "Su hermana Clara";
-    const completeBackground = validateStep(8, draft);
+    const completeBackground = validateStep(9, draft);
     expect(completeBackground.some((issue) => issue.code === "MISSING_BACKGROUND_MINIMUM")).toBe(false);
     expect(completeBackground.some((issue) => issue.code === "MISSING_CORE_CONNECTION")).toBe(false);
   });

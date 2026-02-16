@@ -16,6 +16,8 @@ import type {
 } from "@/domain/types";
 
 const characteristicKeys = ["FUE", "CON", "TAM", "DES", "APA", "INT", "POD", "EDU", "SUERTE"] as const;
+export const SKILL_CREATION_MAX = 75;
+export const SKILL_ABSOLUTE_MAX = 99;
 
 export interface OccupationFormulaChoiceGroup {
   key: string;
@@ -553,14 +555,22 @@ function getBaseSkillValue(skill: string, characteristics: Characteristics): num
   if (normalized === "esquivar") return Math.floor(characteristics.DES / 2);
 
   if (normalized === "armas de fuego (arma corta)") return 20;
+  if (normalized === "armas de fuego (ametralladora)") return 10;
+  if (normalized === "armas de fuego (armamento pesado)") return 10;
+  if (normalized === "armas de fuego (arco)") return 15;
   if (normalized === "armas de fuego (fusil/escopeta)") return 25;
+  if (normalized === "armas de fuego (lanzallamas)") return 10;
+  if (normalized === "armas de fuego (subfusil)") return 15;
   if (normalized === "combatir (pelea)") return 25;
 
   if (normalized === "antropologia") return 1;
   if (normalized === "arqueologia") return 1;
+  if (normalized === "artilleria") return 1;
   if (normalized === "buscar libros") return 20;
+  if (normalized === "bucear") return 1;
   if (normalized === "cerrajeria") return 1;
   if (normalized === "charlataneria") return 5;
+  if (normalized === "demolicion") return 1;
   if (normalized === "ciencias ocultas") return 5;
   if (normalized === "conducir automovil") return 20;
   if (normalized === "conducir maquinaria") return 1;
@@ -570,13 +580,17 @@ function getBaseSkillValue(skill: string, characteristics: Characteristics): num
   if (normalized === "descubrir") return 25;
   if (normalized === "disfrazarse") return 5;
   if (normalized === "electricidad") return 10;
+  if (normalized === "electronica") return 1;
   if (normalized === "encanto") return 15;
   if (normalized === "equitacion") return 5;
   if (normalized === "escuchar") return 20;
   if (normalized === "historia") return 5;
+  if (normalized === "hipnosis") return 1;
+  if (normalized === "informatica") return 5;
   if (normalized === "intimidar") return 15;
   if (normalized === "juego de manos") return 10;
   if (normalized === "lanzar") return 20;
+  if (normalized === "lectura de labios") return 1;
   if (normalized === "mecanica") return 10;
   if (normalized === "medicina") return 1;
   if (normalized === "mitos de cthulhu") return 0;
@@ -591,6 +605,7 @@ function getBaseSkillValue(skill: string, characteristics: Characteristics): num
   if (normalized === "seguir rastros") return 10;
   if (normalized === "sigilo") return 20;
   if (normalized === "tasacion") return 5;
+  if (normalized === "trato con animales") return 5;
   if (normalized === "trepar") return 20;
 
   if (normalized.startsWith("arte/artesania")) return 5;
@@ -661,6 +676,7 @@ export function validateSkillAllocation(
   occupationAssigned: Record<string, number>,
   personalAssigned: Record<string, number>,
   occupationCredit: number = 0,
+  characteristics?: Characteristics,
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
@@ -704,6 +720,46 @@ export function validateSkillAllocation(
       field: "skills.personal",
       severity: "error",
     });
+  }
+
+  const occupationMap = buildSkillPointsMap(occupationAssigned);
+  const personalMap = buildSkillPointsMap(personalAssigned);
+  const canonicalByNormalized = new Map<string, string>();
+  const allAssignedSkills = [...Object.keys(occupationAssigned), ...Object.keys(personalAssigned)];
+
+  for (const skill of allAssignedSkills) {
+    const normalized = normalizeSkillName(skill);
+    if (!canonicalByNormalized.has(normalized)) {
+      canonicalByNormalized.set(normalized, skill);
+    }
+  }
+
+  const normalizedSkills = new Set([...Object.keys(occupationMap), ...Object.keys(personalMap)]);
+  for (const normalizedSkill of normalizedSkills) {
+    if (normalizedSkill === "credito") continue;
+
+    const sampleSkill = canonicalByNormalized.get(normalizedSkill) ?? normalizedSkill;
+    const base = characteristics ? getBaseSkillValue(sampleSkill, characteristics) : 0;
+    const total = base + (occupationMap[normalizedSkill] ?? 0) + (personalMap[normalizedSkill] ?? 0);
+
+    if (total > SKILL_ABSOLUTE_MAX) {
+      issues.push({
+        code: "SKILL_ABSOLUTE_CAP_EXCEEDED",
+        message: `${sampleSkill} supera el tope absoluto de ${SKILL_ABSOLUTE_MAX}%.`,
+        field: `skills.${sampleSkill}`,
+        severity: "error",
+      });
+      continue;
+    }
+
+    if (total > SKILL_CREATION_MAX) {
+      issues.push({
+        code: "SKILL_CREATION_CAP_EXCEEDED",
+        message: `${sampleSkill} supera el tope recomendado de creacion (${SKILL_CREATION_MAX}%).`,
+        field: `skills.${sampleSkill}`,
+        severity: "error",
+      });
+    }
   }
 
   return issues;
@@ -856,6 +912,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
           draft.skills.occupation,
           draft.skills.personal,
           draft.occupation.creditRating,
+          draft.characteristics,
         ),
       );
 
@@ -873,7 +930,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 8) {
+  if (stepId >= 9) {
     const backgroundFields = [
       draft.background.descripcionPersonal,
       draft.background.ideologiaCreencias,
@@ -904,7 +961,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
     }
   }
 
-  if (stepId >= 9) {
+  if (stepId >= 10) {
     if (!draft.equipment.spendingLevel || draft.equipment.spendingLevel.trim().length === 0) {
       issues.push({
         code: "MISSING_SPENDING_LEVEL",
@@ -943,7 +1000,7 @@ export function validateStep(stepId: number, draft: CharacterDraft): ValidationI
 }
 
 export function finalizeCharacter(draft: CharacterDraft): CharacterSheet {
-  const issues = validateStep(9, draft).filter((issue) => issue.severity === "error");
+  const issues = validateStep(10, draft).filter((issue) => issue.severity === "error");
   if (issues.length > 0) {
     throw new Error(`No se puede finalizar: ${issues.map((i) => i.message).join(" | ")}`);
   }

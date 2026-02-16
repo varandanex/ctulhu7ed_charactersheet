@@ -32,6 +32,45 @@ describe("occupation helpers", () => {
     expect(isAllowedOccupationSkill(selection, "Armas de fuego (Fusil/Escopeta)")).toBe(true);
   });
 
+  it("allows occupation allocation to custom firearm specialization when occupation includes generic family", () => {
+    const selection: OccupationSelection = {
+      name: "Agente de policia",
+      creditRating: 20,
+      selectedSkills: [],
+      selectedChoices: {
+        "0:interpersonal": ["Persuasion"],
+        "1:especialidad personal": ["Conducir automovil"],
+      },
+    };
+
+    expect(isAllowedOccupationSkill(selection, "Armas de fuego (Subfusil)")).toBe(true);
+  });
+
+  it("does not allow new combat specializations when occupation only grants Combatir (Pelea)", () => {
+    const selection: OccupationSelection = {
+      name: "Atleta profesional",
+      creditRating: 9,
+      selectedSkills: [],
+      selectedChoices: {},
+    };
+
+    expect(isAllowedOccupationSkill(selection, "Combatir (Espada)")).toBe(false);
+  });
+
+  it("allows custom free-form skill when occupation selected an any-skill choice group", () => {
+    const selection: OccupationSelection = {
+      name: "Investigador privado",
+      creditRating: 20,
+      selectedSkills: [],
+      selectedChoices: {
+        "0:interpersonal": ["Persuasion"],
+        "1:libre": ["Cerrajeria"],
+      },
+    };
+
+    expect(isAllowedOccupationSkill(selection, "Informatica forense")).toBe(true);
+  });
+
   it("never preselects Mitos de Cthulhu in default occupation choices", () => {
     const allDefaultSelections = professionCatalog.occupations.flatMap((occupation) =>
       Object.values(buildDefaultChoiceSelections(occupation.name)).flat(),

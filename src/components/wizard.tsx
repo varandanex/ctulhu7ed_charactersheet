@@ -9,6 +9,7 @@ import {
   buildDefaultChoiceSelections,
   collectAllowedOccupationSkills,
   getChoiceGroupSkillOptions,
+  isAllowedOccupationSkill,
 } from "@/domain/occupation";
 import {
   computeSkillBreakdown,
@@ -17,6 +18,7 @@ import {
   extractOccupationFormulaChoiceGroups,
   finalizeCharacter,
   rollCharacteristicWithAgeModifiersDetailed,
+  SKILL_CREATION_MAX,
   validateStep,
 } from "@/domain/rules";
 import { getFinanceByCredit } from "@/domain/finance";
@@ -62,6 +64,15 @@ const DICE_PIP_LAYOUTS: Record<number, Array<"tl" | "tr" | "ml" | "mr" | "bl" | 
   5: ["tl", "tr", "c", "bl", "br"],
   6: ["tl", "tr", "ml", "mr", "bl", "br"],
 };
+const customSkillBaseOptions = [
+  "Armas de fuego",
+  "Arte/Artesania",
+  "Ciencia",
+  "Combatir",
+  "Lengua propia",
+  "Otras lenguas",
+  "Pilotar",
+];
 
 function parseCreditRange(range: string): { min: number; max: number } {
   const [min, max] = range.split("-").map((n) => Number(n.trim()));
@@ -74,6 +85,10 @@ function normalizeSkillName(skill: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function extractSkillBase(normalizedSkill: string): string {
+  return normalizedSkill.replace(/\s*\([^)]*\)\s*$/, "").trim();
 }
 
 function isForbiddenInitialCreationSkill(skill: string): boolean {
@@ -118,6 +133,36 @@ function formatSkillBaseLabel(base: string): string {
   if (normalized.includes("especialidad")) return "Especialidad";
   const noParen = base.replace(/\s*\([^)]*\)\s*/g, "").trim();
   return noParen.length > 16 ? noParen.slice(0, 16).trim() : noParen;
+}
+
+function buildCustomSkillName(base: string, detail: string): string {
+  const cleanBase = base.trim();
+  const cleanDetail = detail.trim();
+  if (!cleanDetail) return cleanBase;
+  return `${cleanBase} (${cleanDetail})`;
+}
+
+function buildSkillOrderIndexMap(skills: string[]): Map<string, number> {
+  const order = new Map<string, number>();
+  skills.forEach((skill, index) => {
+    const normalized = normalizeSkillName(skill);
+    if (!order.has(normalized)) {
+      order.set(normalized, index);
+    }
+  });
+  return order;
+}
+
+function getSkillSortWeight(skill: string, orderMap: Map<string, number>): number {
+  const normalized = normalizeSkillName(skill);
+  const direct = orderMap.get(normalized);
+  if (typeof direct === "number") return direct * 10;
+
+  const base = extractSkillBase(normalized);
+  const baseDirect = orderMap.get(base);
+  if (typeof baseDirect === "number") return baseDirect * 10 + 5;
+
+  return 100_000;
 }
 
 function getMaturePenaltyTarget(age: number): number {
@@ -327,6 +372,10 @@ export function Wizard({ step }: { step: number }) {
   const [summaryHighlightCharacteristics, setSummaryHighlightCharacteristics] = useState<CharacteristicKey[]>([]);
   const [mobilePointsOpen, setMobilePointsOpen] = useState(false);
   const [helpSkillOpen, setHelpSkillOpen] = useState<string | null>(null);
+  const [customSkillBase, setCustomSkillBase] = useState<string>("Armas de fuego");
+  const [customSkillDetail, setCustomSkillDetail] = useState<string>("");
+  const [customSkillBucket, setCustomSkillBucket] = useState<"occupation" | "personal">("personal");
+  const [customSkillMessage, setCustomSkillMessage] = useState<string>("");
   const [rollingCharacteristic, setRollingCharacteristic] = useState<CharacteristicKey | null>(null);
   const [recentlyRolledCharacteristic, setRecentlyRolledCharacteristic] = useState<CharacteristicKey | null>(null);
   const [rollingPreviewValue, setRollingPreviewValue] = useState<number | null>(null);
@@ -382,16 +431,29 @@ export function Wizard({ step }: { step: number }) {
     () => (draft.occupation ? collectAllowedOccupationSkills(draft.occupation) : []),
     [draft.occupation],
   );
+  const normalizedCatalogSkills = useMemo(
+    () => new Set(investigatorSkillsCatalog.skills.map((skill) => normalizeSkillName(skill))),
+    [],
+  );
   const personalSkills = useMemo(() => {
-    const unique = new Set([...investigatorSkillsCatalog.skills, ...occupationSkills]);
+    const assignedSkills = [...Object.keys(draft.skills.occupation), ...Object.keys(draft.skills.personal)];
+    const unique = new Set([...investigatorSkillsCatalog.skills, ...occupationSkills, ...assignedSkills]);
     return [...unique];
-  }, [occupationSkills]);
+  }, [draft.skills.occupation, draft.skills.personal, occupationSkills]);
   const groupedSkills = useMemo(() => {
     const fallback = ["Mitos de Cthulhu", "Psicologia", "Descubrir", "Buscar libros"];
     const allSkills = personalSkills.length > 0 ? personalSkills : fallback;
     const occupationSet = new Set(occupationSkills);
-    const occupationFirst = allSkills.filter((skill) => occupationSet.has(skill) && !isCreditSkill(skill));
-    const personalOnly = allSkills.filter((skill) => !occupationSet.has(skill) && !isCreditSkill(skill));
+    const orderMap = buildSkillOrderIndexMap(investigatorSkillsCatalog.skills);
+    const byGroupOrder = (a: string, b: string) => {
+      const weightA = getSkillSortWeight(a, orderMap);
+      const weightB = getSkillSortWeight(b, orderMap);
+      if (weightA !== weightB) return weightA - weightB;
+      return a.localeCompare(b, "es");
+    };
+
+    const occupationFirst = allSkills.filter((skill) => occupationSet.has(skill) && !isCreditSkill(skill)).sort(byGroupOrder);
+    const personalOnly = allSkills.filter((skill) => !occupationSet.has(skill) && !isCreditSkill(skill)).sort(byGroupOrder);
     return { occupationFirst, personalOnly };
   }, [occupationSkills, personalSkills]);
 
@@ -436,6 +498,25 @@ export function Wizard({ step }: { step: number }) {
   }, 0);
   const occupationRemaining = occupationPoints - occupationAssigned;
   const personalRemaining = personalPoints - personalAssigned;
+  const finalSkillTotals = useMemo(() => {
+    const candidateSkills = new Set([
+      ...Object.keys(computedSkills),
+      ...Object.keys(draft.skills.occupation),
+      ...Object.keys(draft.skills.personal),
+    ]);
+
+    return [...candidateSkills]
+      .filter((skill) => !isCreditSkill(skill))
+      .map((skill) => {
+        const base = computedSkills[skill]?.base ?? 0;
+        const occupation = draft.skills.occupation[skill] ?? 0;
+        const personal = draft.skills.personal[skill] ?? 0;
+        const total = base + occupation + personal;
+        return { skill, base, occupation, personal, total };
+      })
+      .filter((entry) => entry.occupation + entry.personal > 0)
+      .sort((a, b) => b.total - a.total || a.skill.localeCompare(b.skill, "es"));
+  }, [computedSkills, draft.skills.occupation, draft.skills.personal]);
   const occupationRemainingBudget = Math.max(occupationRemaining, 0);
   const personalRemainingBudget = Math.max(personalRemaining, 0);
   const agePenaltyAllocation = draft.agePenaltyAllocation ?? defaultAgePenaltyAllocation;
@@ -472,7 +553,7 @@ export function Wizard({ step }: { step: number }) {
   const isSummaryRerollFlow = shouldAutoRerollFromSummary;
   const isSummaryRerollInProgress = shouldAutoRerollFromSummary && !summaryRerollCompleted;
   const summaryRerollReturnStep =
-    Number.isFinite(rerollReturnStep) && rerollReturnStep >= 1 && rerollReturnStep <= 9 ? rerollReturnStep : 3;
+    Number.isFinite(rerollReturnStep) && rerollReturnStep >= 1 && rerollReturnStep <= 10 ? rerollReturnStep : 3;
 
   const canContinue = issues.every((issue) => issue.severity !== "error");
   const activeDiceCount = rollingCharacteristic
@@ -505,12 +586,17 @@ export function Wizard({ step }: { step: number }) {
     if (isCreditSkill(skill)) {
       return occupationCreditRange?.max ?? 99;
     }
+    const base = getSkillBase(skill);
+    const otherBucketAssigned = bucket === "occupation" ? (draft.skills.personal[skill] ?? 0) : (draft.skills.occupation[skill] ?? 0);
+    const maxByCreationCap = Math.max(SKILL_CREATION_MAX - base - otherBucketAssigned, 0);
     if (bucket === "occupation") {
       const current = draft.skills.occupation[skill] ?? 0;
-      return Math.max(occupationRemainingBudget + current, 0);
+      const maxByBudget = Math.max(occupationRemainingBudget + current, 0);
+      return Math.min(maxByBudget, maxByCreationCap);
     }
     const current = draft.skills.personal[skill] ?? 0;
-    return Math.max(personalRemainingBudget + current, 0);
+    const maxByBudget = Math.max(personalRemainingBudget + current, 0);
+    return Math.min(maxByBudget, maxByCreationCap);
   }
 
   function pointsStateClass(remaining: number) {
@@ -694,6 +780,45 @@ export function Wizard({ step }: { step: number }) {
     setSkill(bucket, skill, Math.min(normalized, max));
   }
 
+  function getSkillBase(skill: string) {
+    return computedSkills[skill]?.base ?? 0;
+  }
+
+  function handleAddCustomSkill() {
+    const candidate = buildCustomSkillName(customSkillBase, customSkillDetail);
+    const normalizedCandidate = normalizeSkillName(candidate);
+    if (!normalizedCandidate) {
+      setCustomSkillMessage("Escribe una especialidad valida.");
+      return;
+    }
+
+    const exists = [...personalSkills].some((skill) => normalizeSkillName(skill) === normalizedCandidate);
+    if (exists) {
+      setCustomSkillMessage(`${candidate} ya existe en la lista.`);
+      return;
+    }
+
+    if (!normalizedCatalogSkills.has(normalizedCandidate)) {
+      setCustomSkillMessage(`${candidate} no aparece en el libro basico cargado.`);
+      return;
+    }
+
+    if (customSkillBucket === "occupation" && !isAllowedOccupationSkill(draft.occupation, candidate)) {
+      setCustomSkillMessage(`${candidate} no esta habilitada para tu ocupacion actual.`);
+      return;
+    }
+
+    if (isForbiddenInitialCreationSkill(candidate)) {
+      const bucketLabel = customSkillBucket === "occupation" ? "ocupacion" : "interes";
+      setCustomSkillMessage(`${candidate} no puede recibir puntos de ${bucketLabel} al crear personaje.`);
+      return;
+    }
+
+    setSkill(customSkillBucket, candidate, 0);
+    setCustomSkillDetail("");
+    setCustomSkillMessage(`Habilidad agregada: ${candidate}`);
+  }
+
   function setChoiceGroupSkills(groupIndex: number, groupLabel: string, selectedValues: string[], count: number) {
     if (!draft.occupation) return;
     const bounded = selectedValues.filter((skill) => !isForbiddenInitialCreationSkill(skill)).slice(0, count);
@@ -727,7 +852,7 @@ export function Wizard({ step }: { step: number }) {
 
   function goNext() {
     if (!canContinue) return;
-    if (step >= 9) {
+    if (step >= 10) {
       router.push("/crear/resumen");
       return;
     }
@@ -1077,23 +1202,79 @@ export function Wizard({ step }: { step: number }) {
                 <div className="grid two">
                   <div>
                     <label>FUE</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={5}
-                      value={agePenaltyAllocation.youthFuePenalty}
-                      onChange={(e) => setAgePenaltyAllocation({ youthFuePenalty: Number(e.target.value) })}
-                    />
+                    <div className="number-stepper">
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Restar 1 punto a penalizador FUE joven"
+                        onClick={() =>
+                          setAgePenaltyAllocation({
+                            youthFuePenalty: agePenaltyAllocation.youthFuePenalty - 1,
+                          })
+                        }
+                        disabled={agePenaltyAllocation.youthFuePenalty <= 0}
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min={0}
+                        max={5}
+                        value={agePenaltyAllocation.youthFuePenalty}
+                        onChange={(e) => setAgePenaltyAllocation({ youthFuePenalty: Number(e.target.value) })}
+                      />
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Sumar 1 punto a penalizador FUE joven"
+                        onClick={() =>
+                          setAgePenaltyAllocation({
+                            youthFuePenalty: agePenaltyAllocation.youthFuePenalty + 1,
+                          })
+                        }
+                        disabled={agePenaltyAllocation.youthFuePenalty >= 5}
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label>TAM</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={5}
-                      value={agePenaltyAllocation.youthTamPenalty}
-                      onChange={(e) => setAgePenaltyAllocation({ youthTamPenalty: Number(e.target.value) })}
-                    />
+                    <div className="number-stepper">
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Restar 1 punto a penalizador TAM joven"
+                        onClick={() =>
+                          setAgePenaltyAllocation({
+                            youthTamPenalty: agePenaltyAllocation.youthTamPenalty - 1,
+                          })
+                        }
+                        disabled={agePenaltyAllocation.youthTamPenalty <= 0}
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min={0}
+                        max={5}
+                        value={agePenaltyAllocation.youthTamPenalty}
+                        onChange={(e) => setAgePenaltyAllocation({ youthTamPenalty: Number(e.target.value) })}
+                      />
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Sumar 1 punto a penalizador TAM joven"
+                        onClick={() =>
+                          setAgePenaltyAllocation({
+                            youthTamPenalty: agePenaltyAllocation.youthTamPenalty + 1,
+                          })
+                        }
+                        disabled={agePenaltyAllocation.youthTamPenalty >= 5}
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <p className={`points-state ${youthState}`}>
@@ -1107,30 +1288,111 @@ export function Wizard({ step }: { step: number }) {
                 <div className="grid three">
                   <div>
                     <label>FUE</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={agePenaltyAllocation.matureFuePenalty}
-                      onChange={(e) => setAgePenaltyAllocation({ matureFuePenalty: Number(e.target.value) })}
-                    />
+                    <div className="number-stepper">
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Restar 1 punto a penalizador FUE por edad"
+                        onClick={() =>
+                          setAgePenaltyAllocation({
+                            matureFuePenalty: agePenaltyAllocation.matureFuePenalty - 1,
+                          })
+                        }
+                        disabled={agePenaltyAllocation.matureFuePenalty <= 0}
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min={0}
+                        value={agePenaltyAllocation.matureFuePenalty}
+                        onChange={(e) => setAgePenaltyAllocation({ matureFuePenalty: Number(e.target.value) })}
+                      />
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Sumar 1 punto a penalizador FUE por edad"
+                        onClick={() =>
+                          setAgePenaltyAllocation({
+                            matureFuePenalty: agePenaltyAllocation.matureFuePenalty + 1,
+                          })
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label>CON</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={agePenaltyAllocation.matureConPenalty}
-                      onChange={(e) => setAgePenaltyAllocation({ matureConPenalty: Number(e.target.value) })}
-                    />
+                    <div className="number-stepper">
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Restar 1 punto a penalizador CON por edad"
+                        onClick={() =>
+                          setAgePenaltyAllocation({
+                            matureConPenalty: agePenaltyAllocation.matureConPenalty - 1,
+                          })
+                        }
+                        disabled={agePenaltyAllocation.matureConPenalty <= 0}
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min={0}
+                        value={agePenaltyAllocation.matureConPenalty}
+                        onChange={(e) => setAgePenaltyAllocation({ matureConPenalty: Number(e.target.value) })}
+                      />
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Sumar 1 punto a penalizador CON por edad"
+                        onClick={() =>
+                          setAgePenaltyAllocation({
+                            matureConPenalty: agePenaltyAllocation.matureConPenalty + 1,
+                          })
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label>DES</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={agePenaltyAllocation.matureDesPenalty}
-                      onChange={(e) => setAgePenaltyAllocation({ matureDesPenalty: Number(e.target.value) })}
-                    />
+                    <div className="number-stepper">
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Restar 1 punto a penalizador DES por edad"
+                        onClick={() =>
+                          setAgePenaltyAllocation({
+                            matureDesPenalty: agePenaltyAllocation.matureDesPenalty - 1,
+                          })
+                        }
+                        disabled={agePenaltyAllocation.matureDesPenalty <= 0}
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min={0}
+                        value={agePenaltyAllocation.matureDesPenalty}
+                        onChange={(e) => setAgePenaltyAllocation({ matureDesPenalty: Number(e.target.value) })}
+                      />
+                      <button
+                        type="button"
+                        className="stepper-btn"
+                        aria-label="Sumar 1 punto a penalizador DES por edad"
+                        onClick={() =>
+                          setAgePenaltyAllocation({
+                            matureDesPenalty: agePenaltyAllocation.matureDesPenalty + 1,
+                          })
+                        }
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <p className={`points-state ${matureState}`}>
@@ -1742,52 +2004,164 @@ export function Wizard({ step }: { step: number }) {
             </aside>
 
             <div className="grid">
+              <div className="card" style={{ gridColumn: "1 / -1" }}>
+                <p className="kpi">Agregar habilidad o especialidad</p>
+                <div className="grid two">
+                  <div>
+                    <label>Familia base</label>
+                    <select value={customSkillBase} onChange={(event) => setCustomSkillBase(event.target.value)}>
+                      {customSkillBaseOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label>Bolsa inicial</label>
+                    <select
+                      value={customSkillBucket}
+                      onChange={(event) => setCustomSkillBucket(event.target.value as "occupation" | "personal")}
+                    >
+                      <option value="personal">Interes</option>
+                      <option value="occupation">Ocupacion</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid two">
+                  <div>
+                    <label>Especialidad (opcional)</label>
+                    <input
+                      type="text"
+                      value={customSkillDetail}
+                      placeholder="Ej: Subfusil, Quimica, Espanol, Helicoptero..."
+                      onChange={(event) => setCustomSkillDetail(event.target.value)}
+                    />
+                  </div>
+                  <div style={{ alignSelf: "end" }}>
+                    <button type="button" className="primary" onClick={handleAddCustomSkill}>
+                      Agregar
+                    </button>
+                  </div>
+                </div>
+                <p className="small">
+                  Resultado: <strong>{buildCustomSkillName(customSkillBase, customSkillDetail)}</strong>
+                </p>
+                {customSkillMessage && <p className="small">{customSkillMessage}</p>}
+              </div>
+
               {groupedSkills.occupationFirst.length > 0 && (
                 <div className="card" style={{ gridColumn: "1 / -1" }}>
                   <p className="kpi">Habilidades de ocupacion</p>
                 </div>
               )}
               {groupedSkills.occupationFirst.map((skill) => (
-                <div className="card" key={skill}>
-                  <div className="skill-header">
-                    <p>{skill}</p>
-                    <button
-                      type="button"
-                      className="skill-help-trigger"
-                      onClick={() => setHelpSkillOpen(skill)}
-                      aria-label={`Abrir ayuda de ${skill}`}
-                    >
-                      ?
-                    </button>
-                  </div>
-                  <div className="grid two">
-                    <div>
-                      <label>Ocupacion</label>
-                      <input
-                        type="number"
-                        min={isCreditSkill(skill) ? (occupationCreditRange?.min ?? 0) : 0}
-                        max={isCreditSkill(skill) ? (occupationCreditRange?.max ?? 99) : getSkillMax("occupation", skill)}
-                        value={isCreditSkill(skill) ? occupationCreditAssigned : (draft.skills.occupation[skill] ?? 0)}
-                        onChange={(e) => handleSkillChange("occupation", skill, Number(e.target.value))}
-                      />
+                (() => {
+                  const skillComputed = computedSkills[skill];
+                  const skillBase = skillComputed?.base ?? 0;
+                  const skillOccupation = skillComputed?.occupation ?? 0;
+                  const skillPersonal = skillComputed?.personal ?? 0;
+                  const skillTotal = skillComputed?.total ?? 0;
+                  const canAssignOccupation = isAllowedOccupationSkill(draft.occupation, skill);
+                  const occupationMin = 0;
+                  const occupationMax = canAssignOccupation ? getSkillMax("occupation", skill) : 0;
+                  const occupationValue = draft.skills.occupation[skill] ?? 0;
+                  const personalMin = 0;
+                  const personalMax = getSkillMax("personal", skill);
+                  const personalValue = draft.skills.personal[skill] ?? 0;
+
+                  return (
+                    <div className="card" key={skill}>
+                      <div className="skill-header">
+                        <p>{skill}</p>
+                        <button
+                          type="button"
+                          className="skill-help-trigger"
+                          onClick={() => setHelpSkillOpen(skill)}
+                          aria-label={`Abrir ayuda de ${skill}`}
+                        >
+                          ?
+                        </button>
+                      </div>
+                      <div className="skill-total-badge">
+                        <p className="skill-total-label">Total final</p>
+                        <strong>{skillTotal}</strong>
+                        <p className="skill-total-breakdown">Base {skillBase} + Ocupacion {skillOccupation} + Interes {skillPersonal}</p>
+                      </div>
+                      <div className="grid three">
+                        <div>
+                          <label>Base</label>
+                          <input type="number" value={skillBase} readOnly disabled />
+                        </div>
+                        <div>
+                          <label>Ocupacion</label>
+                          <div className="number-stepper">
+                            <button
+                              type="button"
+                              className="stepper-btn"
+                              aria-label={`Restar 1 punto a ocupacion en ${skill}`}
+                              onClick={() => handleSkillChange("occupation", skill, occupationValue - 1)}
+                              disabled={!canAssignOccupation || occupationValue <= occupationMin}
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min={occupationMin}
+                              max={occupationMax}
+                              value={occupationValue}
+                              onChange={(e) => handleSkillChange("occupation", skill, Number(e.target.value))}
+                              disabled={!canAssignOccupation}
+                            />
+                            <button
+                              type="button"
+                              className="stepper-btn"
+                              aria-label={`Sumar 1 punto a ocupacion en ${skill}`}
+                              onClick={() => handleSkillChange("occupation", skill, occupationValue + 1)}
+                              disabled={!canAssignOccupation || occupationValue >= occupationMax}
+                            >
+                              +
+                            </button>
+                          </div>
+                          {!canAssignOccupation && <p className="small">No permitida por tu ocupacion.</p>}
+                        </div>
+                        <div>
+                          <label>Interes</label>
+                          <div className="number-stepper">
+                            <button
+                              type="button"
+                              className="stepper-btn"
+                              aria-label={`Restar 1 punto a interes en ${skill}`}
+                              onClick={() => handleSkillChange("personal", skill, personalValue - 1)}
+                              disabled={personalValue <= personalMin}
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min={personalMin}
+                              max={personalMax}
+                              value={personalValue}
+                              onChange={(e) => handleSkillChange("personal", skill, Number(e.target.value))}
+                            />
+                            <button
+                              type="button"
+                              className="stepper-btn"
+                              aria-label={`Sumar 1 punto a interes en ${skill}`}
+                              onClick={() => handleSkillChange("personal", skill, personalValue + 1)}
+                              disabled={personalValue >= personalMax}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="small">
+                        Dificil {skillComputed?.hard ?? 0} | Extrema {skillComputed?.extreme ?? 0}
+                      </p>
                     </div>
-                    <div>
-                      <label>Interes</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={isCreditSkill(skill) ? 0 : getSkillMax("personal", skill)}
-                        value={isCreditSkill(skill) ? 0 : (draft.skills.personal[skill] ?? 0)}
-                        onChange={(e) => handleSkillChange("personal", skill, Number(e.target.value))}
-                        disabled={isCreditSkill(skill)}
-                      />
-                    </div>
-                  </div>
-                  <p className="small">
-                    Total {computedSkills[skill]?.total ?? 0} | Dificil {computedSkills[skill]?.hard ?? 0} | Extrema{" "}
-                    {computedSkills[skill]?.extreme ?? 0}
-                  </p>
-                </div>
+                  );
+                })()
               ))}
               {groupedSkills.personalOnly.length > 0 && (
                 <div className="card" style={{ gridColumn: "1 / -1" }}>
@@ -1795,33 +2169,112 @@ export function Wizard({ step }: { step: number }) {
                 </div>
               )}
               {groupedSkills.personalOnly.map((skill) => (
-                <div className="card" key={skill}>
-                  <div className="skill-header">
-                    <p>{skill}</p>
-                    <button
-                      type="button"
-                      className="skill-help-trigger"
-                      onClick={() => setHelpSkillOpen(skill)}
-                      aria-label={`Abrir ayuda de ${skill}`}
-                    >
-                      ?
-                    </button>
-                  </div>
-                  <div>
-                    <label>Interes</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={getSkillMax("personal", skill)}
-                      value={draft.skills.personal[skill] ?? 0}
-                      onChange={(e) => handleSkillChange("personal", skill, Number(e.target.value))}
-                    />
-                  </div>
-                  <p className="small">
-                    Total {computedSkills[skill]?.total ?? 0} | Dificil {computedSkills[skill]?.hard ?? 0} | Extrema{" "}
-                    {computedSkills[skill]?.extreme ?? 0}
-                  </p>
-                </div>
+                (() => {
+                  const skillComputed = computedSkills[skill];
+                  const skillBase = skillComputed?.base ?? 0;
+                  const skillOccupation = skillComputed?.occupation ?? 0;
+                  const skillPersonal = skillComputed?.personal ?? 0;
+                  const skillTotal = skillComputed?.total ?? 0;
+                  const canAssignOccupation = isAllowedOccupationSkill(draft.occupation, skill);
+                  const occupationMin = 0;
+                  const occupationMax = canAssignOccupation ? getSkillMax("occupation", skill) : 0;
+                  const occupationValue = draft.skills.occupation[skill] ?? 0;
+                  const personalMin = 0;
+                  const personalMax = getSkillMax("personal", skill);
+                  const personalValue = draft.skills.personal[skill] ?? 0;
+
+                  return (
+                    <div className="card" key={skill}>
+                      <div className="skill-header">
+                        <p>{skill}</p>
+                        <button
+                          type="button"
+                          className="skill-help-trigger"
+                          onClick={() => setHelpSkillOpen(skill)}
+                          aria-label={`Abrir ayuda de ${skill}`}
+                        >
+                          ?
+                        </button>
+                      </div>
+                      <div className="skill-total-badge">
+                        <p className="skill-total-label">Total final</p>
+                        <strong>{skillTotal}</strong>
+                        <p className="skill-total-breakdown">Base {skillBase} + Ocupacion {skillOccupation} + Interes {skillPersonal}</p>
+                      </div>
+                      <div className="grid three">
+                        <div>
+                          <label>Base</label>
+                          <input type="number" value={skillBase} readOnly disabled />
+                        </div>
+                        <div>
+                          <label>Ocupacion</label>
+                          <div className="number-stepper">
+                            <button
+                              type="button"
+                              className="stepper-btn"
+                              aria-label={`Restar 1 punto a ocupacion en ${skill}`}
+                              onClick={() => handleSkillChange("occupation", skill, occupationValue - 1)}
+                              disabled={!canAssignOccupation || occupationValue <= occupationMin}
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min={occupationMin}
+                              max={occupationMax}
+                              value={occupationValue}
+                              onChange={(e) => handleSkillChange("occupation", skill, Number(e.target.value))}
+                              disabled={!canAssignOccupation}
+                            />
+                            <button
+                              type="button"
+                              className="stepper-btn"
+                              aria-label={`Sumar 1 punto a ocupacion en ${skill}`}
+                              onClick={() => handleSkillChange("occupation", skill, occupationValue + 1)}
+                              disabled={!canAssignOccupation || occupationValue >= occupationMax}
+                            >
+                              +
+                            </button>
+                          </div>
+                          {!canAssignOccupation && <p className="small">No permitida por tu ocupacion.</p>}
+                        </div>
+                        <div>
+                          <label>Interes</label>
+                          <div className="number-stepper">
+                            <button
+                              type="button"
+                              className="stepper-btn"
+                              aria-label={`Restar 1 punto a interes en ${skill}`}
+                              onClick={() => handleSkillChange("personal", skill, personalValue - 1)}
+                              disabled={personalValue <= personalMin}
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min={personalMin}
+                              max={personalMax}
+                              value={personalValue}
+                              onChange={(e) => handleSkillChange("personal", skill, Number(e.target.value))}
+                            />
+                            <button
+                              type="button"
+                              className="stepper-btn"
+                              aria-label={`Sumar 1 punto a interes en ${skill}`}
+                              onClick={() => handleSkillChange("personal", skill, personalValue + 1)}
+                              disabled={personalValue >= personalMax}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="small">
+                        Dificil {skillComputed?.hard ?? 0} | Extrema {skillComputed?.extreme ?? 0}
+                      </p>
+                    </div>
+                  );
+                })()
               ))}
             </div>
 
@@ -1867,6 +2320,32 @@ export function Wizard({ step }: { step: number }) {
 
         {step === 7 && (
           <div className="grid">
+            <div className="card" style={{ gridColumn: "1 / -1" }}>
+              <p className="skill-detail-eyebrow">Antes de Credito</p>
+              <h3>Resumen final de habilidades</h3>
+              <p className="small">Revisa los totales por habilidad y usa "Atras" para volver a editar las que quieras ajustar.</p>
+            </div>
+            <div className="card skill-points-summary-card" style={{ gridColumn: "1 / -1" }}>
+              {finalSkillTotals.length === 0 ? (
+                <p className="small">Aun no hay habilidades con puntos asignados.</p>
+              ) : (
+                <div className="skill-points-summary-list">
+                  {finalSkillTotals.map((entry) => (
+                    <div key={entry.skill} className="skill-points-summary-row">
+                      <p>{entry.skill}</p>
+                      <p>
+                        <strong>{entry.total}%</strong> (Base {entry.base}% + Ocupacion {entry.occupation}% + Interes {entry.personal}%)
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === 8 && (
+          <div className="grid">
             {draft.occupation && occupation && (
               <div className="grid two">
                 <div className="card">
@@ -1897,7 +2376,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 8 && (
+        {step === 9 && (
           <div className="grid two">
             <div className="card" style={{ gridColumn: "1 / -1" }}>
               <p className="kpi">Trasfondo</p>
@@ -2021,7 +2500,7 @@ export function Wizard({ step }: { step: number }) {
           </div>
         )}
 
-        {step === 9 && (
+        {step === 10 && (
           <div className="grid">
             <div className="card">
               <p className="kpi">Finanzas (segun Credito)</p>
@@ -2099,7 +2578,7 @@ export function Wizard({ step }: { step: number }) {
               Atras
             </button>
             <button className="primary" type="button" onClick={goNext} disabled={!canContinue}>
-              {step >= 9 ? "Ir al resumen" : "Siguiente"}
+              {step >= 10 ? "Ir al resumen" : "Siguiente"}
             </button>
             <button
               className="ghost"
@@ -2221,7 +2700,7 @@ export function Summary() {
         )}
 
         <div className="actions">
-          <button className="ghost" type="button" onClick={() => router.push("/crear/9")}>
+          <button className="ghost" type="button" onClick={() => router.push("/crear/10")}>
             Volver a editar
           </button>
           <button

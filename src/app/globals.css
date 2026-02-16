@@ -1505,6 +1505,65 @@ input[type="range"]#age-slider::-moz-range-thumb {
   margin: 0;
 }
 
+.skill-total-badge {
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(142, 224, 197, 0.65);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(117, 191, 163, 0.25), transparent 52%),
+    linear-gradient(165deg, rgba(24, 45, 40, 0.8), rgba(15, 28, 29, 0.9));
+  box-shadow:
+    0 0 0 1px rgba(120, 182, 160, 0.2) inset,
+    0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.skill-total-label {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a7c7be;
+}
+
+.skill-total-badge strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 1.55rem;
+  line-height: 1;
+  color: #e9fff6;
+}
+
+.skill-total-breakdown {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: #bfdbd2;
+}
+
+.number-stepper {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: center;
+}
+
+.number-stepper input[type="number"] {
+  text-align: center;
+}
+
+.stepper-btn {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid #4f6668;
+  background: linear-gradient(180deg, #243738, #1a292a);
+  color: #dce9ea;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
 .skill-help-trigger {
   width: 34px;
   min-width: 34px;
@@ -1835,6 +1894,39 @@ input[type="range"]#age-slider::-moz-range-thumb {
   line-height: 1.35;
 }
 
+.skill-points-summary-card {
+  margin-top: 10px;
+}
+
+.skill-points-summary-list {
+  display: grid;
+  gap: 8px;
+}
+
+.skill-points-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  border-bottom: 1px solid rgba(78, 104, 101, 0.45);
+  padding-bottom: 8px;
+}
+
+.skill-points-summary-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.skill-points-summary-row p {
+  margin: 0;
+}
+
+.skill-points-summary-row p:last-child {
+  text-align: right;
+  color: #c6d8d2;
+  font-size: 0.92rem;
+}
+
 @media (max-width: 540px) {
   .skill-detail-sheet {
     width: calc(100vw - 12px);
@@ -1844,6 +1936,15 @@ input[type="range"]#age-slider::-moz-range-thumb {
 
   .skill-detail-base-row {
     width: 100%;
+  }
+
+  .skill-points-summary-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .skill-points-summary-row p:last-child {
+    text-align: left;
   }
 }
 

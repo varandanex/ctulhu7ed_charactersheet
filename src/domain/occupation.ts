@@ -1,6 +1,16 @@
 import type { CharacteristicKey, OccupationSelection } from "@/domain/types";
 import { investigatorSkillsCatalog, professionCatalog, rulesCatalog } from "@/rules-data/catalog";
 
+const SPECIALIZABLE_SKILL_FAMILIES = [
+  "armas de fuego",
+  "arte/artesania",
+  "ciencia",
+  "combatir",
+  "lengua propia",
+  "otras lenguas",
+  "pilotar",
+] as const;
+
 function normalizeText(raw: string): string {
   return raw
     .normalize("NFD")
@@ -18,9 +28,65 @@ function isForbiddenInitialCreationSkill(skill: string): boolean {
   });
 }
 
+function getSkillFamily(normalizedSkill: string): string | null {
+  for (const family of SPECIALIZABLE_SKILL_FAMILIES) {
+    if (normalizedSkill === family || normalizedSkill.startsWith(`${family} (`) || normalizedSkill.startsWith(`${family}(`)) {
+      return family;
+    }
+  }
+
+  return null;
+}
+
+function isGenericFamilyEntry(raw: string, family: string): boolean {
+  const normalized = normalizeText(raw);
+
+  if (normalized === family) return true;
+  if (normalized.includes(`${family} (cualquiera)`)) return true;
+
+  return false;
+}
+
+function collectGenericFamilyAllowances(selection: OccupationSelection): Set<string> {
+  const occupation = professionCatalog.occupations.find((occ) => occ.name === selection.name);
+  if (!occupation) return new Set();
+
+  const genericFamilies = new Set<string>();
+  const selectedFromGroups = Object.values(selection.selectedChoices ?? {}).flatMap((skills) => skills);
+  const rawEntries = [...occupation.skills, ...selectedFromGroups];
+
+  for (const entry of rawEntries) {
+    for (const family of SPECIALIZABLE_SKILL_FAMILIES) {
+      if (isGenericFamilyEntry(entry, family)) {
+        genericFamilies.add(family);
+      }
+    }
+  }
+
+  return genericFamilies;
+}
+
 function looksLikeAnySkillOption(raw: string): boolean {
   const normalized = normalizeText(raw);
   return normalized.includes("cualquiera") || normalized.includes("especialidades");
+}
+
+function selectionHasAnySkillAllowance(selection: OccupationSelection): boolean {
+  const occupation = professionCatalog.occupations.find((occ) => occ.name === selection.name);
+  if (!occupation) return false;
+
+  if (occupation.skills.some((entry) => looksLikeAnySkillOption(entry))) return true;
+
+  const hasAnyChoiceGroup = occupation.choice_groups.some((group, index) => {
+    const key = getGroupKey(index, group.label);
+    const selectedInGroup = selection.selectedChoices?.[key] ?? [];
+    if (selectedInGroup.length === 0) return false;
+    return group.from.some((entry) => looksLikeAnySkillOption(entry));
+  });
+  if (hasAnyChoiceGroup) return true;
+
+  const selectedFromGroups = Object.values(selection.selectedChoices ?? {}).flatMap((skills) => skills);
+  return selectedFromGroups.some((entry) => looksLikeAnySkillOption(entry));
 }
 
 function expandGenericSpecializedSkill(raw: string): string[] {
@@ -124,8 +190,16 @@ export function validateChoiceSelections(selection?: OccupationSelection): strin
 
 export function isAllowedOccupationSkill(selection: OccupationSelection | undefined, skill: string): boolean {
   if (!selection) return false;
+  const normalizedSkill = normalizeText(skill);
   const allowed = collectAllowedOccupationSkills(selection).map((entry) => normalizeText(entry));
-  return allowed.includes(normalizeText(skill));
+  if (allowed.includes(normalizedSkill)) return true;
+  if (selectionHasAnySkillAllowance(selection)) return true;
+
+  const family = getSkillFamily(normalizedSkill);
+  if (!family) return false;
+
+  const genericFamilyAllowances = collectGenericFamilyAllowances(selection);
+  return genericFamilyAllowances.has(family);
 }
 
 export function normalizeSkillName(skill: string): string {
