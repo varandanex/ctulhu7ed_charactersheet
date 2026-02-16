@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type TouchEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { investigatorSkillsCatalog, professionCatalog, rulesCatalog, stepsCatalog } from "@/rules-data/catalog";
@@ -43,6 +43,23 @@ const defaultAgePenaltyAllocation = {
 const AGE_MIN = 15;
 const AGE_MAX = 89;
 const AGE_MARKS = [20, 40, 60, 80];
+const INITIAL_ROLL_ANIMATION_MS = 500;
+const DICE_FACE_VALUES = {
+  front: 1,
+  back: 6,
+  right: 3,
+  left: 4,
+  top: 5,
+  bottom: 2,
+} as const;
+const DICE_PIP_LAYOUTS: Record<number, Array<"tl" | "tr" | "ml" | "mr" | "bl" | "br" | "c">> = {
+  1: ["c"],
+  2: ["tl", "br"],
+  3: ["tl", "c", "br"],
+  4: ["tl", "tr", "bl", "br"],
+  5: ["tl", "tr", "c", "bl", "br"],
+  6: ["tl", "tr", "ml", "mr", "bl", "br"],
+};
 
 function parseCreditRange(range: string): { min: number; max: number } {
   const [min, max] = range.split("-").map((n) => Number(n.trim()));
@@ -140,6 +157,77 @@ function formatRollFormula(formula: string): string {
   return formula.replace(/x/gi, " x ");
 }
 
+function getFormulaModifierTokens(formula: string): string[] {
+  const normalized = formula.replace(/\s+/g, "");
+  const tokens: string[] = [];
+  const additive = normalized.match(/[+-]\d+/g) ?? [];
+  for (const value of additive) {
+    tokens.push(value);
+  }
+  const multiplier = normalized.match(/x(\d+)/i);
+  if (multiplier) {
+    tokens.push(`x${multiplier[1]}`);
+  }
+  return tokens;
+}
+
+function getCharacteristicDiceCount(key: CharacteristicKey): number {
+  const formula = rulesCatalog.characteristics_generation[key];
+  const d6Match = formula.match(/(\d+)D6/i);
+  const parsed = d6Match ? Number(d6Match[1]) : 3;
+  if (!Number.isFinite(parsed)) return 3;
+  return Math.max(1, Math.min(3, parsed));
+}
+
+function isDiceSumFormula(formula: string): boolean {
+  const match = formula.match(/(\d+)D\d+/i);
+  if (!match) return false;
+  return Number(match[1]) > 1;
+}
+
+function extractRolledDiceFromStep(stepLine: string): number[] {
+  const match = stepLine.match(/\[([^\]]+)\]/);
+  if (!match) return [];
+  return match[1]
+    .split(",")
+    .map((item) => Number(item.trim()))
+    .filter((value) => Number.isFinite(value) && value >= 1 && value <= 6)
+    .slice(0, 3);
+}
+
+function dieSettleTransform(value: number): string {
+  switch (value) {
+    case 1:
+      return "rotateX(12deg) rotateY(-16deg) rotateZ(0deg)";
+    case 2:
+      return "rotateX(102deg) rotateY(-10deg) rotateZ(0deg)";
+    case 3:
+      return "rotateX(8deg) rotateY(-106deg) rotateZ(0deg)";
+    case 4:
+      return "rotateX(8deg) rotateY(78deg) rotateZ(0deg)";
+    case 5:
+      return "rotateX(-82deg) rotateY(12deg) rotateZ(0deg)";
+    case 6:
+      return "rotateX(8deg) rotateY(164deg) rotateZ(0deg)";
+    default:
+      return "rotateX(12deg) rotateY(-16deg) rotateZ(0deg)";
+  }
+}
+
+function renderDieFace(className: string, value: number) {
+  const pipLayout = DICE_PIP_LAYOUTS[value] ?? DICE_PIP_LAYOUTS[1];
+  return (
+    <i className={className}>
+      <span className="dice-face-pips">
+        {pipLayout.map((pip, index) => (
+          <span key={`${className}-${value}-pip-${index}`} className={`dice-pip ${pip}`} />
+        ))}
+      </span>
+      <b className="dice-face-value">{value}</b>
+    </i>
+  );
+}
+
 function Issues({ issues }: { issues: ValidationIssue[] }) {
   if (issues.length === 0) return null;
   return (
@@ -156,15 +244,20 @@ function Issues({ issues }: { issues: ValidationIssue[] }) {
 export function Wizard({ step }: { step: number }) {
   const router = useRouter();
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showResetRollsModal, setShowResetRollsModal] = useState(false);
   const [mobilePointsOpen, setMobilePointsOpen] = useState(false);
   const [helpSkillOpen, setHelpSkillOpen] = useState<string | null>(null);
   const [rollingCharacteristic, setRollingCharacteristic] = useState<CharacteristicKey | null>(null);
+  const [recentlyRolledCharacteristic, setRecentlyRolledCharacteristic] = useState<CharacteristicKey | null>(null);
+  const [rollingPreviewValue, setRollingPreviewValue] = useState<number | null>(null);
+  const [diceValues, setDiceValues] = useState<number[]>([]);
   const [characteristicRollDetails, setCharacteristicRollDetails] = useState<Partial<Record<CharacteristicKey, string[]>>>({});
   const [occupationSlideIndex, setOccupationSlideIndex] = useState(0);
   const [occupationImageErrors, setOccupationImageErrors] = useState<Record<string, boolean>>({});
   const [occupationImageLoaded, setOccupationImageLoaded] = useState<Record<string, boolean>>({});
   const [occupationImageOrientation, setOccupationImageOrientation] = useState<Record<string, "portrait" | "landscape">>({});
-  const rollTimeoutRef = useRef<number | null>(null);
+  const launchTimeoutRef = useRef<number | null>(null);
+  const rollPreviewIntervalRef = useRef<number | null>(null);
   const occupationTouchStartX = useRef<number | null>(null);
   const occupationTouchStartY = useRef<number | null>(null);
   const occupationTouchCurrentX = useRef<number | null>(null);
@@ -259,13 +352,13 @@ export function Wizard({ step }: { step: number }) {
   const agePenaltyAllocation = draft.agePenaltyAllocation ?? defaultAgePenaltyAllocation;
   const completedCharacteristicCount = characteristicKeys.filter((key) => typeof draft.characteristics[key] === "number").length;
   const nextCharacteristicToRoll = characteristicKeys.find((key) => typeof draft.characteristics[key] !== "number");
+  const currentCharacteristicInRoll = rollingCharacteristic ?? recentlyRolledCharacteristic ?? nextCharacteristicToRoll ?? null;
+  const isFirstRollPending =
+    completedCharacteristicCount === 0 &&
+    nextCharacteristicToRoll === characteristicKeys[0] &&
+    !rollingCharacteristic;
   const allCharacteristicsRolled = completedCharacteristicCount === characteristicKeys.length;
-  const visibleCharacteristicKeys = useMemo(() => {
-    if (rollingCharacteristic) return [rollingCharacteristic];
-    if (nextCharacteristicToRoll) return [nextCharacteristicToRoll];
-    const lastRolled = [...characteristicKeys].reverse().find((key) => typeof draft.characteristics[key] === "number");
-    return lastRolled ? [lastRolled] : [characteristicKeys[0]];
-  }, [draft.characteristics, rollingCharacteristic, nextCharacteristicToRoll]);
+  const highlightedCharacteristic = rollingCharacteristic ?? recentlyRolledCharacteristic ?? nextCharacteristicToRoll ?? null;
   const youthTarget = draft.age >= 15 && draft.age <= 19 ? 5 : 0;
   const ageGuidance = useMemo(() => getAgeGuidance(draft.age), [draft.age]);
   const youthCurrent = agePenaltyAllocation.youthFuePenalty + agePenaltyAllocation.youthTamPenalty;
@@ -279,6 +372,20 @@ export function Wizard({ step }: { step: number }) {
   const eduImprovementRolls = getEduImprovementRolls(draft.age);
 
   const canContinue = issues.every((issue) => issue.severity !== "error");
+  const activeDiceCount = rollingCharacteristic
+    ? getCharacteristicDiceCount(rollingCharacteristic)
+    : highlightedCharacteristic
+      ? getCharacteristicDiceCount(highlightedCharacteristic)
+      : Math.max(1, Math.min(3, diceValues.length || 3));
+  const highlightedFormulaModifiers = highlightedCharacteristic
+    ? getFormulaModifierTokens(rulesCatalog.characteristics_generation[highlightedCharacteristic])
+    : [];
+  const showDiceSumPlus =
+    highlightedCharacteristic && isDiceSumFormula(rulesCatalog.characteristics_generation[highlightedCharacteristic]);
+  const highlightedRollValue =
+    highlightedCharacteristic && typeof draft.characteristics[highlightedCharacteristic] === "number"
+      ? draft.characteristics[highlightedCharacteristic]
+      : null;
 
   function getBoundedAge(rawAge: number): number {
     if (!Number.isFinite(rawAge)) return AGE_MIN;
@@ -303,37 +410,110 @@ export function Wizard({ step }: { step: number }) {
     return "warn";
   }
 
-  function handleRollNextCharacteristic() {
+  function handlePrepareNextCharacteristic() {
     if (!nextCharacteristicToRoll || rollingCharacteristic) return;
-    const characteristicToRoll = nextCharacteristicToRoll;
+    const characteristicToPrepare = nextCharacteristicToRoll;
+    const diceCount = getCharacteristicDiceCount(characteristicToPrepare);
     if (typeof draft.lastRolledAge !== "number" || completedCharacteristicCount === 0) {
       setLastRolledAge(draft.age);
     }
 
-    setRollingCharacteristic(characteristicToRoll);
-    if (rollTimeoutRef.current !== null) {
-      window.clearTimeout(rollTimeoutRef.current);
+    setRollingCharacteristic(characteristicToPrepare);
+    setRollingPreviewValue(Math.floor(Math.random() * 99) + 1);
+    setDiceValues(Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
+    if (rollPreviewIntervalRef.current !== null) {
+      window.clearInterval(rollPreviewIntervalRef.current);
     }
-    rollTimeoutRef.current = window.setTimeout(() => {
+    rollPreviewIntervalRef.current = window.setInterval(() => {
+      setRollingPreviewValue(Math.floor(Math.random() * 99) + 1);
+      setDiceValues(Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
+    }, 72);
+    setRecentlyRolledCharacteristic(null);
+  }
+
+  function handleLaunchPreparedCharacteristic() {
+    if (!rollingCharacteristic) return;
+    const characteristicToRoll = rollingCharacteristic;
+    const diceCount = getCharacteristicDiceCount(characteristicToRoll);
+    const detail = rollCharacteristicWithAgeModifiersDetailed(characteristicToRoll, draft.age, agePenaltyAllocation);
+    setCharacteristic(characteristicToRoll, detail.finalValue);
+    const rolledDice = extractRolledDiceFromStep(detail.steps[0] ?? "");
+    setDiceValues(rolledDice.length > 0 ? rolledDice : Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
+    setCharacteristicRollDetails((current) => ({
+      ...current,
+      [characteristicToRoll]: detail.steps,
+    }));
+    if (rollPreviewIntervalRef.current !== null) {
+      window.clearInterval(rollPreviewIntervalRef.current);
+      rollPreviewIntervalRef.current = null;
+    }
+    setRecentlyRolledCharacteristic(characteristicToRoll);
+    setRollingPreviewValue(null);
+    setRollingCharacteristic(null);
+  }
+
+  function handleLaunchNextCharacteristic() {
+    if (!nextCharacteristicToRoll) return;
+    const characteristicToRoll = nextCharacteristicToRoll;
+    const diceCount = getCharacteristicDiceCount(characteristicToRoll);
+    if (typeof draft.lastRolledAge !== "number" || completedCharacteristicCount === 0) {
+      setLastRolledAge(draft.age);
+    }
+
+    setRecentlyRolledCharacteristic(null);
+    setRollingCharacteristic(characteristicToRoll);
+    setRollingPreviewValue(Math.floor(Math.random() * 99) + 1);
+    setDiceValues(Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
+    if (rollPreviewIntervalRef.current !== null) {
+      window.clearInterval(rollPreviewIntervalRef.current);
+    }
+    rollPreviewIntervalRef.current = window.setInterval(() => {
+      setRollingPreviewValue(Math.floor(Math.random() * 99) + 1);
+      setDiceValues(Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
+    }, 72);
+    if (launchTimeoutRef.current !== null) {
+      window.clearTimeout(launchTimeoutRef.current);
+    }
+    launchTimeoutRef.current = window.setTimeout(() => {
       const detail = rollCharacteristicWithAgeModifiersDetailed(characteristicToRoll, draft.age, agePenaltyAllocation);
       setCharacteristic(characteristicToRoll, detail.finalValue);
+      const rolledDice = extractRolledDiceFromStep(detail.steps[0] ?? "");
+      setDiceValues(rolledDice.length > 0 ? rolledDice : Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
       setCharacteristicRollDetails((current) => ({
         ...current,
         [characteristicToRoll]: detail.steps,
       }));
+      if (rollPreviewIntervalRef.current !== null) {
+        window.clearInterval(rollPreviewIntervalRef.current);
+        rollPreviewIntervalRef.current = null;
+      }
+      launchTimeoutRef.current = null;
+      setRecentlyRolledCharacteristic(characteristicToRoll);
+      setRollingPreviewValue(null);
       setRollingCharacteristic(null);
-      rollTimeoutRef.current = null;
-    }, 1000);
+    }, INITIAL_ROLL_ANIMATION_MS);
   }
 
   function handleResetCharacteristicRolls() {
-    if (rollTimeoutRef.current !== null) {
-      window.clearTimeout(rollTimeoutRef.current);
-      rollTimeoutRef.current = null;
+    setShowResetRollsModal(true);
+  }
+
+  function handleConfirmResetCharacteristicRolls() {
+    if (launchTimeoutRef.current !== null) {
+      window.clearTimeout(launchTimeoutRef.current);
+      launchTimeoutRef.current = null;
     }
+    if (rollPreviewIntervalRef.current !== null) {
+      window.clearInterval(rollPreviewIntervalRef.current);
+      rollPreviewIntervalRef.current = null;
+    }
+    setRecentlyRolledCharacteristic(null);
+    setRollingPreviewValue(null);
+    setDiceValues([]);
     setRollingCharacteristic(null);
     setCharacteristicRollDetails({});
     clearCharacteristics();
+    setShowResetRollsModal(false);
   }
 
   function getCharacteristicRollSource(key: CharacteristicKey): string {
@@ -433,8 +613,11 @@ export function Wizard({ step }: { step: number }) {
 
   useEffect(() => {
     return () => {
-      if (rollTimeoutRef.current !== null) {
-        window.clearTimeout(rollTimeoutRef.current);
+      if (launchTimeoutRef.current !== null) {
+        window.clearTimeout(launchTimeoutRef.current);
+      }
+      if (rollPreviewIntervalRef.current !== null) {
+        window.clearInterval(rollPreviewIntervalRef.current);
       }
     };
   }, []);
@@ -736,37 +919,90 @@ export function Wizard({ step }: { step: number }) {
           <div className="grid two">
             <div className="card roll-substeps-card" style={{ gridColumn: "1 / -1" }}>
               <p className="kpi">Subpaso 2.1: Tiradas de caracteristicas</p>
-              <p className="roll-progress">
-                {completedCharacteristicCount} / {characteristicKeys.length} completadas
-              </p>
               <p className="roll-next-step">
-                {rollingCharacteristic
-                  ? `Lanzando ${rollingCharacteristic}...`
-                  : nextCharacteristicToRoll
-                    ? `Siguiente tirada: ${nextCharacteristicToRoll}`
-                    : "Tiradas completadas"}
+                {currentCharacteristicInRoll
+                  ? `Habilidad en curso: ${currentCharacteristicInRoll}`
+                  : "Habilidad en curso: completadas"}
               </p>
-              {(rollingCharacteristic || nextCharacteristicToRoll) && (
+              {highlightedCharacteristic && (
                 <p className="roll-source">
                   Tirada:{` `}
-                  {getCharacteristicRollSource((rollingCharacteristic ?? nextCharacteristicToRoll) as CharacteristicKey)}
+                  {getCharacteristicRollSource(highlightedCharacteristic)}
                 </p>
               )}
               {rollingCharacteristic && (
-                <p className="roll-breakdown">Preparando detalle de la tirada...</p>
+                <p className="roll-breakdown">Preview en curso. Pulsa "Lanzar característica" para confirmar.</p>
               )}
-              <div className={`dice-roll-indicator ${rollingCharacteristic ? "active" : ""}`} aria-live="polite">
-                <span className="dice-icon" aria-hidden="true" />
-                <span>{rollingCharacteristic ? "Tirada en curso" : "Listo para lanzar"}</span>
+              <div className={`dice-roller-3d ${rollingCharacteristic ? "active" : ""} ${!rollingCharacteristic && diceValues.length > 0 ? "settled" : ""}`} aria-hidden="true">
+                <div className="dice-expression-group">
+                  <div className="dice-sum-group">
+                    {showDiceSumPlus && <span className="dice-group-paren">(</span>}
+                    {[0, 1, 2].map((index) => {
+                      const value = diceValues[index] ?? 1;
+                      const style = {
+                        "--dice-settle-transform": dieSettleTransform(value),
+                      } as CSSProperties;
+                      const hidden = index >= activeDiceCount;
+                      const sizeClass = index === 0 ? "dice-cube-a" : index === 1 ? "dice-cube-b" : "dice-cube-c";
+
+                      return (
+                        <Fragment key={`roll-die-${index}`}>
+                          <span className={`dice-cube ${sizeClass} ${hidden ? "hidden" : ""}`} style={style}>
+                            {renderDieFace("dice-face dice-face-front", DICE_FACE_VALUES.front)}
+                            {renderDieFace("dice-face dice-face-back", DICE_FACE_VALUES.back)}
+                            {renderDieFace("dice-face dice-face-right", DICE_FACE_VALUES.right)}
+                            {renderDieFace("dice-face dice-face-left", DICE_FACE_VALUES.left)}
+                            {renderDieFace("dice-face dice-face-top", DICE_FACE_VALUES.top)}
+                            {renderDieFace("dice-face dice-face-bottom", DICE_FACE_VALUES.bottom)}
+                          </span>
+                          {showDiceSumPlus && !hidden && index < activeDiceCount - 1 && <span className="dice-plus-badge">+</span>}
+                        </Fragment>
+                      );
+                    })}
+                    {showDiceSumPlus && <span className="dice-group-paren">)</span>}
+                  </div>
+                  {highlightedFormulaModifiers.length > 0 && (
+                    <p className="dice-formula-modifiers" aria-live="polite">
+                      {highlightedFormulaModifiers.map((modifier) => (
+                        <span key={`modifier-${highlightedCharacteristic}-${modifier}`} className="dice-formula-modifier-chip">
+                          {modifier}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                </div>
+                {highlightedCharacteristic && (
+                  <span
+                    key={`dice-total-${highlightedCharacteristic}-${highlightedRollValue ?? "pending"}`}
+                    className={`dice-total-badge ${highlightedRollValue === null ? "" : "dice-total-badge--updated"}`}
+                    aria-live="polite"
+                  >
+                    {highlightedRollValue === null ? "= ?" : `= ${highlightedRollValue}`}
+                  </span>
+                )}
               </div>
               <div className="roll-substeps-actions">
+                {!isFirstRollPending && (
+                  <button
+                    className={`primary ${rollingCharacteristic ? "rolling" : ""}`}
+                    type="button"
+                    onClick={handlePrepareNextCharacteristic}
+                    disabled={!nextCharacteristicToRoll || Boolean(rollingCharacteristic)}
+                  >
+                    {nextCharacteristicToRoll ? `Siguiente característica (${nextCharacteristicToRoll})` : "Sin pendientes"}
+                  </button>
+                )}
                 <button
-                  className={`primary ${rollingCharacteristic ? "rolling" : ""}`}
+                  className="primary"
                   type="button"
-                  onClick={handleRollNextCharacteristic}
-                  disabled={!nextCharacteristicToRoll || Boolean(rollingCharacteristic)}
+                  onClick={isFirstRollPending ? handleLaunchNextCharacteristic : handleLaunchPreparedCharacteristic}
+                  disabled={isFirstRollPending ? !nextCharacteristicToRoll : !rollingCharacteristic}
                 >
-                  {rollingCharacteristic ? "Lanzando..." : `Lanzar ${nextCharacteristicToRoll ?? ""}`}
+                  {isFirstRollPending
+                    ? `Lanzar ${nextCharacteristicToRoll ?? "característica"}`
+                    : rollingCharacteristic
+                      ? `Lanzar ${rollingCharacteristic}`
+                      : "Lanzar característica"}
                 </button>
                 <button className="ghost" type="button" onClick={handleResetCharacteristicRolls}>
                   Reiniciar tiradas
@@ -774,35 +1010,6 @@ export function Wizard({ step }: { step: number }) {
               </div>
               <p className="small">Ve lanzando una por una y observa como van quedando los valores.</p>
             </div>
-            {visibleCharacteristicKeys.map((key) => (
-              <div
-                className={`card characteristic-card ${nextCharacteristicToRoll === key ? "current" : ""} ${
-                  rollingCharacteristic === key ? "rolling" : ""
-                } ${
-                  typeof draft.characteristics[key] === "number" ? "done" : ""
-                }`}
-                key={key}
-              >
-                <p className="characteristic-label">{key}</p>
-                <p className="characteristic-value">{rollingCharacteristic === key ? "..." : (draft.characteristics[key] ?? "--")}</p>
-                <p className="characteristic-roll-source">{getCharacteristicRollSource(key)}</p>
-                {(characteristicRollDetails[key] ?? []).length > 0 && (
-                  <div className="characteristic-roll-detail">
-                    {(characteristicRollDetails[key] ?? []).map((line, index) => (
-                      <p key={`${key}-detail-${index}`}>{line}</p>
-                    ))}
-                  </div>
-                )}
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={draft.characteristics[key] ?? ""}
-                  onChange={(e) => setCharacteristic(key, Number(e.target.value))}
-                  disabled
-                />
-              </div>
-            ))}
             {allCharacteristicsRolled && (
               <div className="card" style={{ gridColumn: "1 / -1" }}>
                 <p className="kpi">Derivados previos:</p>
@@ -1379,6 +1586,15 @@ export function Wizard({ step }: { step: number }) {
         </div>
       </section>
       <ResetProgressModal open={showResetModal} onCancel={() => setShowResetModal(false)} onConfirm={handleConfirmReset} />
+      <ResetProgressModal
+        open={showResetRollsModal}
+        onCancel={() => setShowResetRollsModal(false)}
+        onConfirm={handleConfirmResetCharacteristicRolls}
+        title="Reiniciar tiradas"
+        message="¿Estás seguro de reiniciar tiradas? Las tiradas anteriores se perderán."
+        confirmLabel="Sí, reiniciar tiradas"
+        ariaLabel="Confirmar reinicio de tiradas"
+      />
     </main>
   );
 }
