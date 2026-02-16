@@ -106,7 +106,7 @@
       "tags": ["lovecraftiana"],
       "credit_range": "9-30",
       "occupation_points_formula": "EDU x4",
-      "skills": ["Arte (Literatura)", "Buscar libros", "Historia", "Lengua propia", "Naturaleza o Ciencia", "Otras lenguas", "Psicologia"],
+      "skills": ["Arte (Literatura)", "Buscar libros", "Historia", "Lengua propia", "Naturaleza o Ciencias ocultas", "Otras lenguas", "Psicologia"],
       "choice_groups": [{"count": 1, "from": ["cualquiera"], "label": "libre"}]
     },
     {
